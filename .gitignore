@@ -1,0 +1,21 @@
+# Python
+backend/.venv/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/outputs/*
+!backend/outputs/.gitkeep
+__pycache__/
+*.pyc
+
+# Node
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+
+# Env
+.env
+backend/.env
+mobile/.env
+
+# OS
+.DS_Store

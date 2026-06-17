@@ -1,0 +1,10 @@
+export const FFT_HOP = 256;
+export const N_FFT = 8 * FFT_HOP;
+export const AUDIO_SAMPLE_RATE = 22050;
+export const AUDIO_WINDOW_LENGTH = 2;
+export const ANNOTATIONS_FPS = Math.floor(AUDIO_SAMPLE_RATE / FFT_HOP);
+export const ANNOT_N_FRAMES = ANNOTATIONS_FPS * AUDIO_WINDOW_LENGTH;
+export const AUDIO_N_SAMPLES = AUDIO_SAMPLE_RATE * AUDIO_WINDOW_LENGTH - FFT_HOP;
+export const MIDI_OFFSET = 21;
+export const MAX_FREQ_IDX = 87;
+export const N_OVERLAPPING_FRAMES = 30;

@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "TuneScribe",
+    "slug": "tunescribe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "tunescribe",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tunescribe.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "TuneScribe needs microphone access to record piano and vocal performances for transcription."
+      }
+    },
+    "android": {
+      "package": "com.tunescribe.app",
+      "permissions": ["RECORD_AUDIO"],
+      "adaptiveIcon": {
+        "backgroundColor": "#0c0e14",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "assetBundlePatterns": [
+      "assets/models/**"
+    ],
+    "plugins": [
+      "expo-dev-client",
+      "expo-router",
+      "expo-document-picker",
+      "onnxruntime-react-native",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0c0e14"
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "tunescribe",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:mobile": "cd mobile && npm run start:dev",
+    "dev:mobile:lan": "cd mobile && npm run start:dev:lan",
+    "build:ios:dev": "cd mobile && eas build --profile development --platform ios",
+    "setup:backend": "cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+  }
+}

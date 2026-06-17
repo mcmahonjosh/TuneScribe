@@ -1,0 +1,7 @@
+{"sessionId":"fc4923","location":"basicPitch.ts:unwrap","message":"matrix ready","data":{"batchCount":5,"nFrames":605,"audioSamples":155181},"hypothesisId":"E","timestamp":1781688541182,"runId":"post-fix"}
+{"sessionId":"fc4923","location":"extractNotesMobileFast.ts:entry","message":"extract start","data":{"nFrames":605,"minF":0,"maxF":87,"minNoteLen":6,"build":"yield-v7"},"hypothesisId":"A","timestamp":1781688541184,"runId":"post-fix"}
+{"sessionId":"fc4923","location":"extractNotesMobileFast.ts:done","message":"extract complete","data":{"nFrames":605,"peakCount":88,"cappedPeakCount":88,"noteCount":36,"elapsedMs":3},"hypothesisId":"A","timestamp":1781688541187,"runId":"post-fix"}
+{"sessionId":"fc4923","location":"basicPitch.ts:postMidiNotes","message":"basic pitch complete","data":{"noteCount":36},"hypothesisId":"C","timestamp":1781688541216,"runId":"post-fix"}
+{"sessionId":"fc4923","location":"localTranscribe.ts:postBasicPitch","message":"basic pitch returned","data":{"rawNoteCount":36,"build":"yield-v7"},"hypothesisId":"D","timestamp":1781688541216,"runId":"post-fix"}
+{"sessionId":"fc4923","location":"basicPitch.ts:preMidiNotes","message":"before noteEventsToMidiNotes","data":{"eventCount":36},"hypothesisId":"C","timestamp":1781688541215,"runId":"post-fix"}
+{"sessionId":"fc4923","location":"midiPipeline.ts:entry","message":"midi pipeline start","data":{"rawNoteCount":36,"mode":"piano_polyphonic"},"hypothesisId":"D","timestamp":1781688541249,"runId":"post-fix"}
