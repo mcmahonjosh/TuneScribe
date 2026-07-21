@@ -1,14 +1,11 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import ProcessingStatus from '@/components/ProcessingStatus';
 import RecordingControls from '@/components/RecordingControls';
 import TranscriptionSettingsPanel from '@/components/TranscriptionSettingsPanel';
-import { AppHeader, Button, Card, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
-import { useProcessingMode } from '@/context/ProcessingModeContext';
-import { checkHealthDetailed } from '@/services/api';
-import { getApiBaseUrl } from '@/utils/apiConfig';
+import { AppHeader, Card, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
 import {
   playAudio,
   requestRecordingPermissions,
@@ -35,8 +32,8 @@ function createProjectId(): string {
 
 export default function RecordScreen() {
   const router = useRouter();
-  const { processingMode, isLocalMode } = useProcessingMode();
-  const [projectId] = useState(createProjectId);
+  const [projectId, setProjectId] = useState(createProjectId);
+  const projectIdRef = useRef(projectId);
   const [isRecording, setIsRecording] = useState(false);
   const [audioPath, setAudioPath] = useState<string | null>(null);
   const [status, setStatus] = useState<ProjectStatus>('idle');
@@ -48,10 +45,29 @@ export default function RecordScreen() {
     () => defaultSettingsForInputType('piano')
   );
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
-  const [backendStatus, setBackendStatus] = useState<string>('Not tested');
 
   const now = () => new Date().toISOString();
-  const apiBase = getApiBaseUrl();
+
+  const resetForNewRecording = useCallback(() => {
+    const nextId = createProjectId();
+    projectIdRef.current = nextId;
+    setProjectId(nextId);
+    setIsRecording(false);
+    setAudioPath(null);
+    setStatus('idle');
+    setProcessingStep('idle');
+    setProcessingProgress(null);
+    setErrorMessage(undefined);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Tab screens stay mounted — mint a fresh project when returning after a completed run.
+      if (status === 'complete') {
+        resetForNewRecording();
+      }
+    }, [status, resetForNewRecording])
+  );
 
   const PIANO_OUTPUT_OPTIONS: {
     id: PianoOutputFormat;
@@ -79,40 +95,26 @@ export default function RecordScreen() {
     setTranscriptionSettings(defaultSettingsForInputType(inputType));
   }, [inputType]);
 
-  async function handleTestBackend() {
-    const result = await checkHealthDetailed();
-    if (result.ok) {
-      setBackendStatus(`OK (${result.status})`);
-      Alert.alert('Backend connected', `${result.url}\n\n${result.body ?? ''}`);
-      return;
-    }
-    setBackendStatus('Failed');
-    Alert.alert(
-      'Backend unreachable',
-      `URL: ${result.url}\n` +
-        (result.status ? `HTTP ${result.status}\n` : '') +
-        (result.error ? `Error: ${result.error}\n\n` : '\n') +
-        'Safari works but the app does not?\n' +
-        '→ iPhone Settings → TuneScribe → enable Local Network\n' +
-        '→ Settings → Privacy → Local Network → TuneScribe ON\n\n' +
-        'Then restart the app and tap Test Backend again.'
-    );
-  }
-
   async function handleStart() {
     const granted = await requestRecordingPermissions();
     if (!granted) {
       Alert.alert('Permission required', 'Microphone access is needed to record audio.');
       return;
     }
-    await startRecording(projectId, { preferWav: isLocalMode });
+    // Always start a new project so re-recording does not overwrite the previous one.
+    const nextId = createProjectId();
+    projectIdRef.current = nextId;
+    setProjectId(nextId);
+    setAudioPath(null);
+    setErrorMessage(undefined);
+    await startRecording(nextId, { preferWav: true });
     setIsRecording(true);
     setStatus('recording');
-    setErrorMessage(undefined);
   }
 
   async function handleStop() {
-    const path = await stopRecording(projectId, { preferWav: isLocalMode });
+    const activeId = projectIdRef.current;
+    const path = await stopRecording(activeId, { preferWav: true });
     setAudioPath(path);
     setIsRecording(false);
     setStatus('idle');
@@ -125,9 +127,10 @@ export default function RecordScreen() {
 
   async function handleSubmit() {
     if (!audioPath) return;
+    const activeId = projectIdRef.current;
 
     const project: Project = {
-      id: projectId,
+      id: activeId,
       title: `Recording ${new Date().toLocaleString()}`,
       createdAt: now(),
       updatedAt: now(),
@@ -139,14 +142,13 @@ export default function RecordScreen() {
 
     try {
       setStatus('uploading');
-      setProcessingStep(isLocalMode ? 'decoding_audio' : 'server_transcribe');
-      setProcessingProgress(isLocalMode ? { step: 'decoding_audio', fraction: 0 } : null);
+      setProcessingStep('decoding_audio');
+      setProcessingProgress({ step: 'decoding_audio', fraction: 0 });
       setErrorMessage(undefined);
 
       const transcriptionMode = modeForInputType(inputType);
       const result = await transcribeProject({
-        processingMode,
-        projectId,
+        projectId: activeId,
         audioUri: audioPath,
         filename: audioPath.endsWith('.wav') ? 'recording.wav' : 'recording.m4a',
         transcriptionMode,
@@ -160,7 +162,7 @@ export default function RecordScreen() {
       });
 
       setStatus('processing');
-      await updateProjectStatus(projectId, 'processing');
+      await updateProjectStatus(activeId, 'processing');
 
       const completed: Project = {
         ...project,
@@ -179,7 +181,6 @@ export default function RecordScreen() {
         chordsPath: result.chordsPath,
         chordsPreviewWavPath: result.chordsPreviewWavPath,
         detectedKey: result.detectedKey,
-        backendJobId: result.backendJobId,
         processingModeUsed: result.processingModeUsed,
         errorMessage: result.errorMessage,
       };
@@ -187,16 +188,16 @@ export default function RecordScreen() {
       setStatus('complete');
       setProcessingStep('complete');
       setProcessingProgress({ step: 'complete', fraction: 1 });
-      router.push(`/project/${projectId}`);
+      router.push(`/project/${activeId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setStatus('failed');
       setProcessingStep('failed');
       setProcessingProgress(null);
       setErrorMessage(message);
-      await updateProjectStatus(projectId, 'failed', message);
+      await updateProjectStatus(activeId, 'failed', message);
       await saveProject({
-        id: projectId,
+        id: activeId,
         title: `Recording ${new Date().toLocaleString()}`,
         createdAt: project.createdAt,
         updatedAt: now(),
@@ -214,19 +215,10 @@ export default function RecordScreen() {
     <Screen scroll contentContainerStyle={styles.container}>
       <AppHeader title="New Recording" subtitle="Record 15–60 seconds of solo piano or vocal audio." />
 
-      {isLocalMode ? (
-        <Card style={styles.section}>
-          <MutedText>
-            Local mode runs Basic Pitch on your phone. Keep the app open while processing. Falls
-            back to the backend if on-device transcription fails.
-          </MutedText>
-        </Card>
-      ) : null}
-
       <Card style={styles.section}>
-        <MutedText style={styles.mono}>Backend: {apiBase}</MutedText>
-        <MutedText>Status: {backendStatus}</MutedText>
-        <Button label="Test Backend" variant="secondary" onPress={handleTestBackend} />
+        <MutedText>
+          Processing runs entirely on your device. Keep the app open while transcribing.
+        </MutedText>
       </Card>
 
       <View style={styles.chipRow}>
@@ -280,7 +272,6 @@ export default function RecordScreen() {
           errorMessage={errorMessage}
           processingStepLabel={PROCESSING_STEP_LABELS[processingStep]}
           progressFraction={processingProgress?.fraction}
-          debugCheckpoint={processingProgress?.checkpoint}
         />
       ) : (
         <RecordingControls
@@ -300,7 +291,6 @@ export default function RecordScreen() {
 const styles = StyleSheet.create({
   container: { gap: 16, paddingBottom: 40 },
   section: { gap: 8 },
-  mono: { fontSize: 12 },
   chipRow: { flexDirection: 'row', gap: 10 },
   flexChip: { flex: 1 },
 });

@@ -1,10 +1,9 @@
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { LOCAL_PIPELINE_BUILD } from '@/constants/localPipelineBuild';
+import { OFFLINE_ONLY } from '@/constants/appConfig';
 import { useProcessingMode } from '@/context/ProcessingModeContext';
 import { useTheme } from '@/context/ThemeContext';
-import { getJsBundleSource } from '@/utils/devBundleSource';
 
 interface AppHeaderProps {
   title: string;
@@ -17,7 +16,7 @@ export default function AppHeader({
   title,
   subtitle,
   showThemeToggle = true,
-  showProcessingToggle = true,
+  showProcessingToggle = !OFFLINE_ONLY,
 }: AppHeaderProps) {
   const { theme, themeId, toggleTheme } = useTheme();
   const { processingMode, toggleProcessingMode } = useProcessingMode();
@@ -28,11 +27,6 @@ export default function AppHeader({
         <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
         {subtitle ? (
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text>
-        ) : null}
-        {processingMode === 'local' ? (
-          <Text style={[styles.buildTag, { color: theme.textMuted }]}>
-            {LOCAL_PIPELINE_BUILD} · {getJsBundleSource()}
-          </Text>
         ) : null}
       </View>
       <View style={styles.actions}>
@@ -94,7 +88,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, marginTop: 4, lineHeight: 20 },
-  buildTag: { fontSize: 11, marginTop: 2 },
   processingToggle: {
     minWidth: 72,
     height: 40,

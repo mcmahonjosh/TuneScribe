@@ -17,13 +17,12 @@ import SheetMusicPlayer, {
 import { Button, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useThemedStyles } from '@/hooks/useThemedStyles';
-import { getFileDownloadUrl } from '@/services/api';
 import { playAudio, stopAudioPlayback } from '@/services/audio';
-import { deleteProjectFiles, downloadFileToProjectIfOk } from '@/services/files';
-import { deleteProject, getProject, saveProject } from '@/storage/projectRepository';
+import { deleteProjectFiles } from '@/services/files';
+import { deleteProject, getProject } from '@/storage/projectRepository';
 import { ChordProgressionData, Project } from '@/types/project';
 import { readFileAsBase64 } from '@/utils/fileEncoding';
-import { isValidWavFile, removeInvalidPreviewWav } from '@/utils/wavValidation';
+import { isValidWavFile, waitForValidWavFile } from '@/utils/wavValidation';
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -97,73 +96,16 @@ export default function ProjectDetailScreen() {
       if (!id) return;
       let data = await getProject(id);
       if (data?.previewWavPath) {
-        await removeInvalidPreviewWav(data.previewWavPath);
-        if (!(await isValidWavFile(data.previewWavPath))) {
+        const ready = await waitForValidWavFile(data.previewWavPath, 8000);
+        if (!ready) {
           data = { ...data, previewWavPath: undefined };
         }
       }
 
-      if (data && !data.previewWavPath && data.backendJobId) {
-        const previewWavPath = await downloadFileToProjectIfOk(
-          data.id,
-          'preview.wav',
-          getFileDownloadUrl(`/files/${data.backendJobId}/preview.wav`)
-        );
-        if (previewWavPath && (await isValidWavFile(previewWavPath))) {
-          data = {
-            ...data,
-            previewWavPath,
-            updatedAt: new Date().toISOString(),
-          };
-          await saveProject(data);
-        }
-      }
-
-      if (data && !data.pdfPath && data.backendJobId && data.inputType === 'sheet') {
-        const pdfPath = await downloadFileToProjectIfOk(
-          data.id,
-          'output.pdf',
-          getFileDownloadUrl(`/files/${data.backendJobId}/output.pdf`)
-        );
-        if (pdfPath) {
-          data = { ...data, pdfPath, updatedAt: new Date().toISOString() };
-          await saveProject(data);
-        }
-      }
-
-      if (data && !data.midiPath && data.backendJobId && data.inputType === 'sheet') {
-        const midiPath = await downloadFileToProjectIfOk(
-          data.id,
-          'preview.mid',
-          getFileDownloadUrl(`/files/${data.backendJobId}/preview.mid`)
-        );
-        if (midiPath) {
-          data = { ...data, midiPath, updatedAt: new Date().toISOString() };
-          await saveProject(data);
-        }
-      }
-
-      if (data && !data.chordsPath && data.backendJobId) {
-        const chordsPath = await downloadFileToProjectIfOk(
-          data.id,
-          'chords.json',
-          getFileDownloadUrl(`/files/${data.backendJobId}/chords.json`)
-        );
-        if (chordsPath) {
-          data = { ...data, chordsPath, updatedAt: new Date().toISOString() };
-          await saveProject(data);
-        }
-      }
-
-      if (data && !data.chordsPreviewWavPath && data.backendJobId) {
-        const chordsPreviewWavPath = await downloadFileToProjectIfOk(
-          data.id,
-          'chords_preview.wav',
-          getFileDownloadUrl(`/files/${data.backendJobId}/chords_preview.wav`)
-        );
-        if (chordsPreviewWavPath) {
-          data = { ...data, chordsPreviewWavPath, updatedAt: new Date().toISOString() };
-          await saveProject(data);
+      if (data?.chordsPreviewWavPath) {
+        const chordsReady = await waitForValidWavFile(data.chordsPreviewWavPath, 4000);
+        if (!chordsReady) {
+          data = { ...data, chordsPreviewWavPath: undefined };
         }
       }
 
@@ -208,63 +150,39 @@ export default function ProjectDetailScreen() {
       Alert.alert('Sharing unavailable', `File saved at: ${path}`);
       return;
     }
-    await Sharing.shareAsync(path);
+
+    const lower = path.toLowerCase();
+    const stamp = Date.now();
+    let shareUri = path;
+    let mimeType: string | undefined;
+    let uti: string | undefined;
+
+    if (lower.endsWith('.musicxml') || lower.endsWith('.xml')) {
+      const dest = `${FileSystem.cacheDirectory}TuneScribe_${stamp}.musicxml`;
+      await FileSystem.copyAsync({ from: path, to: dest });
+      shareUri = dest;
+      mimeType = 'application/vnd.recordare.musicxml+xml';
+      uti = 'public.xml';
+    } else if (lower.endsWith('.mid') || lower.endsWith('.midi')) {
+      const dest = `${FileSystem.cacheDirectory}TuneScribe_${stamp}.mid`;
+      await FileSystem.copyAsync({ from: path, to: dest });
+      shareUri = dest;
+      mimeType = 'audio/midi';
+      uti = 'public.midi-audio';
+    } else if (lower.endsWith('.json')) {
+      mimeType = 'application/json';
+      uti = 'public.json';
+    }
+
+    await Sharing.shareAsync(shareUri, {
+      mimeType,
+      UTI: uti,
+      dialogTitle: `Export ${label}`,
+    });
   }
 
-  async function handleExportPdf() {
-    if (!project) return;
-
-    let pdfPath = project.pdfPath;
-    if (!pdfPath && project.backendJobId) {
-      pdfPath = await downloadFileToProjectIfOk(
-        project.id,
-        'output.pdf',
-        getFileDownloadUrl(`/files/${project.backendJobId}/output.pdf`)
-      );
-      if (pdfPath) {
-        const updated = { ...project, pdfPath, updatedAt: new Date().toISOString() };
-        await saveProject(updated);
-        setProject(updated);
-      }
-    }
-
-    if (!pdfPath) {
-      Alert.alert(
-        'PDF unavailable',
-        'Install MuseScore on the backend PC to generate PDF export, or share the MusicXML file instead.'
-      );
-      return;
-    }
-
-    await shareFile(pdfPath, 'PDF');
-  }
-
-  async function ensureChordPreviewPath(): Promise<string | undefined> {
-    if (!project) {
-      return undefined;
-    }
-    if (project.chordsPreviewWavPath) {
-      return project.chordsPreviewWavPath;
-    }
-    if (!project.backendJobId) {
-      return undefined;
-    }
-    const chordsPreviewWavPath = await downloadFileToProjectIfOk(
-      project.id,
-      'chords_preview.wav',
-      getFileDownloadUrl(`/files/${project.backendJobId}/chords_preview.wav`)
-    );
-    if (!chordsPreviewWavPath) {
-      return undefined;
-    }
-    const updated = {
-      ...project,
-      chordsPreviewWavPath,
-      updatedAt: new Date().toISOString(),
-    };
-    await saveProject(updated);
-    setProject(updated);
-    return chordsPreviewWavPath;
+  function ensureChordPreviewPath(): string | undefined {
+    return project?.chordsPreviewWavPath;
   }
 
   async function handlePlayOriginal() {
@@ -275,16 +193,17 @@ export default function ProjectDetailScreen() {
   }
 
   async function handlePlayPreview() {
-    if (!project?.previewWavPath) {
+    const path = project?.previewWavPath;
+    if (!path || !(await isValidWavFile(path))) {
       Alert.alert(
         'Preview unavailable',
-        'Re-transcribe this recording to generate preview audio.'
+        'Preview audio was not saved for this project. Sheet music and exports still work.'
       );
       return;
     }
     sheetPlayerRef.current?.stop();
     chordPlayerRef.current?.stop();
-    await playAudio(project.previewWavPath);
+    await playAudio(path);
   }
 
   async function handlePlayChords() {
@@ -293,11 +212,11 @@ export default function ProjectDetailScreen() {
     }
     setDetailView('chords');
     if (!project.chordsPreviewWavPath) {
-      const path = await ensureChordPreviewPath();
+      const path = ensureChordPreviewPath();
       if (!path) {
         Alert.alert(
           'Chord playback unavailable',
-          'This project does not have chord audio yet. Re-transcribe with Chord progression or Both selected on the Record tab.'
+          'This project does not have chord audio yet. Record again with Chord progression or Both selected on the Record tab.'
         );
         return;
       }
@@ -433,13 +352,6 @@ export default function ProjectDetailScreen() {
                 label="Export Chords"
                 variant="secondary"
                 onPress={() => shareFile(project.chordsPath, 'Chords JSON')}
-              />
-            )}
-            {(project.pdfPath || project.inputType === 'sheet') && (
-              <Button
-                label={project.pdfPath ? 'Export PDF' : 'Download PDF'}
-                variant="secondary"
-                onPress={handleExportPdf}
               />
             )}
           </View>

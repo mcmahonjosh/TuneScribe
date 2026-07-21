@@ -1,8 +1,8 @@
 import { Alert } from 'react-native';
 
 export const MUSICXML_EXTENSIONS = ['.musicxml', '.xml', '.mxl'] as const;
-export const OMR_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'] as const;
-export const ALLOWED_SHEET_EXTENSIONS = [...MUSICXML_EXTENSIONS, ...OMR_EXTENSIONS] as const;
+export const ALLOWED_SHEET_EXTENSIONS = [...MUSICXML_EXTENSIONS] as const;
+const MIDI_EXTENSIONS = ['.mid', '.midi'] as const;
 
 export interface PickedSheetFile {
   uri: string;
@@ -14,14 +14,17 @@ export type SheetPickResult =
   | { status: 'canceled' }
   | { status: 'unavailable' };
 
-export function isOmrSheetName(name: string): boolean {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
-  return (OMR_EXTENSIONS as readonly string[]).includes(ext);
+function fileExtension(name: string): string {
+  return name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
 }
 
 export function isAllowedSheetName(name: string): boolean {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
-  return !ext || (ALLOWED_SHEET_EXTENSIONS as readonly string[]).includes(ext);
+  const ext = fileExtension(name);
+  return (ALLOWED_SHEET_EXTENSIONS as readonly string[]).includes(ext);
+}
+
+export function isMidiFilename(name: string): boolean {
+  return (MIDI_EXTENSIONS as readonly string[]).includes(fileExtension(name));
 }
 
 export function validateSheetName(name: string): boolean {
@@ -29,9 +32,17 @@ export function validateSheetName(name: string): boolean {
     return true;
   }
 
+  if (isMidiFilename(name)) {
+    Alert.alert(
+      'MIDI not supported here',
+      'Transpose needs a MusicXML file (.musicxml, .xml, or .mxl). Export MusicXML from your project (not MIDI), save it to Files, then pick that file.'
+    );
+    return false;
+  }
+
   Alert.alert(
     'Unsupported file',
-    'Choose MusicXML/MXL, PDF, or an image (JPG/PNG) of sheet music.'
+    'Choose a MusicXML or MXL file (.musicxml, .xml, or .mxl). MIDI files cannot be transposed in offline v1.'
   );
   return false;
 }
@@ -40,15 +51,10 @@ export function validateSheetName(name: string): boolean {
 export async function pickSheetWithDocumentPicker(): Promise<SheetPickResult> {
   try {
     const DocumentPicker = await import('expo-document-picker');
+    // iOS often tags exported MusicXML as public.data / octet-stream, so MIME
+    // filters hide them. Allow all files and validate by extension.
     const result = await DocumentPicker.getDocumentAsync({
-      type: [
-        'application/xml',
-        'text/xml',
-        'application/vnd.recordare.musicxml+xml',
-        'application/zip',
-        'application/pdf',
-        'image/*',
-      ],
+      type: '*/*',
       copyToCacheDirectory: true,
     });
 

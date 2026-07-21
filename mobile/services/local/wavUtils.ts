@@ -50,11 +50,11 @@ export async function decodeAudioFileToMono22050(
 
   if (bytes.length >= 8 && readAscii(view, 4, 4) === 'ftyp') {
     throw new Error(
-      'Local mode received compressed audio (M4A) instead of WAV. Re-record in Local mode or switch to Backend mode.'
+      'Received compressed audio (M4A) instead of WAV. Re-record in WAV format.'
     );
   }
 
-  throw new Error('Local mode requires WAV recordings. Re-record or switch to Backend mode.');
+  throw new Error('WAV recordings are required. Re-record in WAV format.');
 }
 
 function decodeWavPcm(bytes: Uint8Array): Float32Array {
@@ -168,13 +168,20 @@ export function encodeWavMono16(samples: Float32Array, sampleRate = 22050): Uint
 
 export async function writeWavFile(uri: string, samples: Float32Array, sampleRate = 22050): Promise<void> {
   const bytes = encodeWavMono16(samples, sampleRate);
-  const chunkSize = 0x8000;
+  const chunkSize = 0x2000;
   let binary = '';
   for (let i = 0; i < bytes.length; i += chunkSize) {
-    const slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode(...slice);
+    const end = Math.min(i + chunkSize, bytes.length);
+    for (let j = i; j < end; j += 1) {
+      binary += String.fromCharCode(bytes[j]);
+    }
   }
-  await FileSystem.writeAsStringAsync(uri, btoa(binary), {
+
+  // Write to a temp path first so validators never see a half-written WAV.
+  const tempUri = `${uri}.partial`;
+  await FileSystem.writeAsStringAsync(tempUri, btoa(binary), {
     encoding: FileSystem.EncodingType.Base64,
   });
+  await FileSystem.deleteAsync(uri, { idempotent: true });
+  await FileSystem.moveAsync({ from: tempUri, to: uri });
 }

@@ -36,12 +36,12 @@ function buildPickerHtml(background: string, text: string, primary: string): str
 </head>
 <body>
   <h1>Choose sheet music</h1>
-  <p>Select MusicXML/MXL, PDF, or a photo (JPG/PNG) of sheet music.</p>
+  <p>Select a MusicXML or MXL file (.musicxml, .xml, .mxl). MIDI is not supported.</p>
   <label for="sheet-input">Browse files</label>
   <input
     id="sheet-input"
     type="file"
-    accept=".musicxml,.xml,.mxl,.pdf,.jpg,.jpeg,.png,.webp,application/xml,text/xml,application/vnd.recordare.musicxml+xml,application/zip,application/pdf,image/*"
+    accept=".musicxml,.xml,.mxl,application/xml,text/xml,application/vnd.recordare.musicxml+xml,application/octet-stream,*/*"
   />
   <script>
     const input = document.getElementById('sheet-input');

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { OFFLINE_ONLY } from '@/constants/appConfig';
 import {
   loadProcessingMode,
   saveProcessingMode,
@@ -21,7 +22,7 @@ interface ProcessingModeContextValue {
   toggleProcessingMode: () => void;
 }
 
-const DEFAULT_MODE: ProcessingMode = 'backend';
+const DEFAULT_MODE: ProcessingMode = OFFLINE_ONLY ? 'local' : 'backend';
 
 const ProcessingModeContext = createContext<ProcessingModeContextValue | null>(null);
 
@@ -29,6 +30,9 @@ export function ProcessingModeProvider({ children }: { children: ReactNode }) {
   const [processingMode, setProcessingModeState] = useState<ProcessingMode>(DEFAULT_MODE);
 
   useEffect(() => {
+    if (OFFLINE_ONLY) {
+      return;
+    }
     void loadProcessingMode().then((stored) => {
       if (stored) {
         setProcessingModeState(stored);
@@ -37,22 +41,30 @@ export function ProcessingModeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setProcessingMode = useCallback((mode: ProcessingMode) => {
+    if (OFFLINE_ONLY) {
+      return;
+    }
     setProcessingModeState(mode);
     void saveProcessingMode(mode);
   }, []);
 
   const toggleProcessingMode = useCallback(() => {
+    if (OFFLINE_ONLY) {
+      return;
+    }
     setProcessingMode(processingMode === 'backend' ? 'local' : 'backend');
   }, [processingMode, setProcessingMode]);
 
+  const effectiveMode: ProcessingMode = OFFLINE_ONLY ? 'local' : processingMode;
+
   const value = useMemo(
     () => ({
-      processingMode,
-      isLocalMode: processingMode === 'local',
+      processingMode: effectiveMode,
+      isLocalMode: effectiveMode === 'local',
       setProcessingMode,
       toggleProcessingMode,
     }),
-    [processingMode, setProcessingMode, toggleProcessingMode]
+    [effectiveMode, setProcessingMode, toggleProcessingMode]
   );
 
   return (

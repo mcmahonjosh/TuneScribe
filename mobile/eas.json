@@ -8,6 +8,10 @@
       "developmentClient": true,
       "distribution": "internal",
       "node": "20.19.4",
+      "env": {
+        "APP_ENV": "development",
+        "EAS_BUILD_PROFILE": "development"
+      },
       "ios": {
         "simulator": false
       },
@@ -16,13 +20,24 @@
       }
     },
     "production": {
+      "developmentClient": false,
       "node": "20.19.4",
+      "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production",
+        "EAS_BUILD_PROFILE": "production"
+      },
       "ios": {
         "simulator": false
       },
       "android": {
         "buildType": "app-bundle"
       }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
     }
   }
 }

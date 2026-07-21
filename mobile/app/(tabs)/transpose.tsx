@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, Text } from 'react-native';
 
 import KeyPicker from '@/components/KeyPicker';
 import ProcessingStatus from '@/components/ProcessingStatus';
@@ -9,22 +9,17 @@ import {
   AppHeader,
   Button,
   Card,
-  Chip,
   MutedText,
   Screen,
-  SectionTitle,
 } from '@/components/ui';
-import { useProcessingMode } from '@/context/ProcessingModeContext';
 import { useTheme } from '@/context/ThemeContext';
-import { checkHealthDetailed, getTransposeSettings } from '@/services/api';
 import { saveFileToProject } from '@/services/files';
 import { transposeProject } from '@/services/processing/transposeProject';
-import { isOmrInputFilename, PROCESSING_STEP_LABELS, type ProcessingStep } from '@/services/processing/types';
+import { PROCESSING_STEP_LABELS, type ProcessingStep } from '@/services/processing/types';
 import { pickSheetWithDocumentPicker, validateSheetName } from '@/services/sheetPicker';
 import { saveProject, updateProjectStatus } from '@/storage/projectRepository';
 import { Project, ProjectStatus } from '@/types/project';
-import { DEFAULT_TARGET_KEY, OmrEngine, TargetKey } from '@/types/transpose';
-import { getApiBaseUrl } from '@/utils/apiConfig';
+import { DEFAULT_TARGET_KEY, TargetKey } from '@/types/transpose';
 
 function createProjectId(): string {
   return `project_${Date.now()}`;
@@ -33,7 +28,6 @@ function createProjectId(): string {
 export default function TransposeScreen() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { processingMode, isLocalMode } = useProcessingMode();
   const [projectId, setProjectId] = useState(createProjectId);
   const [sheetUri, setSheetUri] = useState<string | null>(null);
   const [sheetName, setSheetName] = useState<string | null>(null);
@@ -41,46 +35,10 @@ export default function TransposeScreen() {
   const [targetKey, setTargetKey] = useState<TargetKey>(DEFAULT_TARGET_KEY);
   const [status, setStatus] = useState<ProjectStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
-  const [backendStatus, setBackendStatus] = useState<string>('Not tested');
-  const [omrEngine, setOmrEngine] = useState<OmrEngine>('audiveris');
-  const [audiverisAvailable, setAudiverisAvailable] = useState<boolean | null>(null);
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
 
-  const OMR_OPTIONS: { id: OmrEngine; label: string; hint: string }[] = [
-    {
-      id: 'audiveris',
-      label: 'Faster model',
-      hint: 'Best for clean PDF scans — higher accuracy and usually finishes in about a minute. Not as good at reading phone photos.',
-    },
-    {
-      id: 'oemer',
-      label: 'Slower model',
-      hint: 'Better for photos, including slightly blurry or angled shots. Takes about 2–3 minutes but handles difficult images more reliably.',
-    },
-  ];
-
-  useEffect(() => {
-    getTransposeSettings()
-      .then((settings) => setAudiverisAvailable(settings.audiveris_available))
-      .catch(() => setAudiverisAvailable(null));
-  }, []);
-
   const now = () => new Date().toISOString();
-  const apiBase = getApiBaseUrl();
   const isSubmitting = status === 'uploading' || status === 'processing';
-  const isPhotoInput = sheetName ? /\.(jpe?g|png|webp)$/i.test(sheetName) : false;
-
-  async function handleTestBackend() {
-    const result = await checkHealthDetailed();
-    if (result.ok) {
-      setBackendStatus(`OK (${result.status})`);
-      Alert.alert('Backend connected', `${result.url}\n\n${result.body ?? ''}`);
-      return;
-    }
-
-    setBackendStatus('Failed');
-    Alert.alert('Backend unreachable', `${result.url}\n${result.error ?? ''}`);
-  }
 
   async function handlePickSheet() {
     const result = await pickSheetWithDocumentPicker();
@@ -129,7 +87,7 @@ export default function TransposeScreen() {
 
     try {
       setStatus('uploading');
-      setProcessingStep(isLocalMode && !isOmrInputFilename(sheetName) ? 'exporting_musicxml' : 'server_omr');
+      setProcessingStep('exporting_musicxml');
       setErrorMessage(undefined);
 
       const sourceSheetPath = await saveFileToProject(attemptId, sheetName, sheetUri);
@@ -138,12 +96,10 @@ export default function TransposeScreen() {
       await updateProjectStatus(attemptId, 'processing');
 
       const result = await transposeProject({
-        processingMode,
         projectId: attemptId,
         sheetUri,
         sheetName,
         targetKey,
-        omrEngine,
         onStep: setProcessingStep,
       });
       const completed: Project = {
@@ -156,8 +112,6 @@ export default function TransposeScreen() {
         musicxmlPath: result.musicxmlPath,
         midiPath: result.midiPath,
         previewWavPath: result.previewWavPath,
-        pdfPath: result.pdfPath,
-        backendJobId: result.backendJobId,
         processingModeUsed: result.processingModeUsed,
         errorMessage: result.errorMessage,
       };
@@ -185,60 +139,18 @@ export default function TransposeScreen() {
     <Screen scroll contentContainerStyle={styles.container}>
       <AppHeader
         title="Transpose Sheet Music"
-        subtitle="Upload MusicXML/MXL, PDF, or a photo. PDF/image reading uses OMR before transposing."
+        subtitle="Upload a MusicXML or MXL file to transpose to a new key on your device."
       />
 
-      {isLocalMode ? (
-        <Card style={styles.section}>
-          <MutedText>
-            Local mode transposes MusicXML/MXL on your phone. PDF and photo uploads still use the
-            backend for sheet reading (OMR).
-          </MutedText>
-        </Card>
-      ) : null}
-
       <Card style={styles.section}>
-        <SectionTitle>Sheet reading model</SectionTitle>
-        <MutedText subtle>Only used for PDFs and photos. MusicXML uploads skip this step.</MutedText>
-        <View style={styles.chipRow}>
-          {OMR_OPTIONS.map((option) => {
-            const disabled =
-              isSubmitting || (option.id === 'audiveris' && audiverisAvailable === false);
-            return (
-              <Chip
-                key={option.id}
-                label={option.label}
-                selected={omrEngine === option.id}
-                onPress={() => setOmrEngine(option.id)}
-                disabled={disabled}
-                style={styles.flexChip}
-              />
-            );
-          })}
-        </View>
-        <MutedText>{OMR_OPTIONS.find((option) => option.id === omrEngine)?.hint}</MutedText>
-        {audiverisAvailable === false && (
-          <Text style={[styles.warning, { color: theme.error }]}>
-            Faster model is not available on the backend yet. Install Audiveris or use the slower
-            model.
-          </Text>
-        )}
-        {isPhotoInput && omrEngine === 'audiveris' && (
-          <Text style={[styles.warning, { color: theme.warning }]}>
-            Phone photos often fail with the faster model. Use the slower model for photos,
-            especially if the image is hard to read.
-          </Text>
-        )}
-      </Card>
-
-      <Card style={styles.section}>
-        <MutedText style={styles.mono}>Backend: {apiBase}</MutedText>
-        <MutedText>Status: {backendStatus}</MutedText>
-        <Button label="Test Backend" variant="secondary" onPress={handleTestBackend} />
+        <MutedText>
+          Use a MusicXML file (.musicxml, .xml, or .mxl). From a recording project, tap Export
+          MusicXML and save to Files — not Export MIDI. MIDI cannot be transposed in offline v1.
+        </MutedText>
       </Card>
 
       <Button
-        label={sheetName ? `Selected: ${sheetName}` : 'Choose sheet music file'}
+        label={sheetName ? `Selected: ${sheetName}` : 'Choose MusicXML file'}
         variant="ghost"
         onPress={handlePickSheet}
         disabled={isSubmitting}
@@ -258,7 +170,7 @@ export default function TransposeScreen() {
         <Card style={[styles.section, { borderColor: theme.errorMuted }]}>
           <Text style={[styles.errorTitle, { color: theme.error }]}>Transpose failed</Text>
           <Text style={[styles.errorMessage, { color: theme.error }]}>{errorMessage}</Text>
-          <MutedText>Change the file, key, or reading model below, then try again.</MutedText>
+          <MutedText>Change the file or key below, then try again.</MutedText>
         </Card>
       ) : null}
 
@@ -283,10 +195,6 @@ export default function TransposeScreen() {
 const styles = StyleSheet.create({
   container: { gap: 16, paddingBottom: 40 },
   section: { gap: 8 },
-  mono: { fontSize: 12 },
-  chipRow: { flexDirection: 'row', gap: 10 },
-  flexChip: { flex: 1 },
-  warning: { fontSize: 12, lineHeight: 17 },
   errorTitle: { fontSize: 15, fontWeight: '700' },
   errorMessage: { fontSize: 13, lineHeight: 18 },
 });

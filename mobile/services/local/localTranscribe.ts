@@ -1,11 +1,9 @@
-import { LOCAL_PIPELINE_BUILD } from '@/constants/localPipelineBuild';
 import { ensureProjectDir } from '@/services/files';
 import { runBasicPitchOnAudio } from '@/services/local/basicPitch';
 import { writeChordProgression } from '@/services/local/chordProgression';
 import { exportMusicXmlFromNotes } from '@/services/local/musicxmlExport';
 import { runMidiPipeline } from '@/services/local/midiPipeline';
 import { type LocalTranscriptionMode } from '@/services/local/modeHandlers';
-import { readMidiNotes } from '@/services/local/midiFile';
 import {
   formatDetectedKey,
   type ChordKeyInfo,
@@ -18,7 +16,6 @@ import {
   type ProcessingProgressCallback,
   type ProcessingStep,
 } from '@/services/processing/types';
-import { agentDebugLog, setAgentDebugProjectDir } from '@/utils/agentDebugLog';
 
 export interface LocalTranscribeParams {
   projectId: string;
@@ -40,10 +37,6 @@ export interface LocalTranscribeFiles {
 }
 
 const STALL_TIMEOUT_MS = 60_000;
-
-function formatCheckpoint(checkpoint: string): string {
-  return `${LOCAL_PIPELINE_BUILD} · ${checkpoint}`;
-}
 
 async function runWithStallGuard<T>(
   getCheckpoint: () => string,
@@ -78,10 +71,9 @@ export async function runLocalTranscription(
   params: LocalTranscribeParams
 ): Promise<{ response: TranscribeResponse; files: LocalTranscribeFiles }> {
   const projectDir = await ensureProjectDir(params.projectId);
-  setAgentDebugProjectDir(projectDir);
 
   let lastProgress = mapStageProgress('decoding_audio', 0, LOCAL_TRANSCRIBE_RANGES.decoding_audio);
-  let pipelineCheckpoint = formatCheckpoint('init');
+  let pipelineCheckpoint = 'init';
   let pipelineCheckpointAt = Date.now();
 
   const report = (progress: ReturnType<typeof mapStageProgress>, checkpoint?: string) => {
@@ -98,7 +90,7 @@ export async function runLocalTranscription(
   };
 
   const markCheckpoint = (checkpoint: string) => {
-    pipelineCheckpoint = formatCheckpoint(checkpoint);
+    pipelineCheckpoint = checkpoint;
     pipelineCheckpointAt = Date.now();
     report(lastProgress, pipelineCheckpoint);
   };
@@ -116,31 +108,18 @@ export async function runLocalTranscription(
         minimumFrequency: params.mode === 'piano_polyphonic' ? 27.5 : undefined,
         maximumFrequency: params.mode === 'piano_polyphonic' ? 4186 : undefined,
         onExtractComplete: () => {
-          report(
-            mapStageProgress('cleaning_midi', 0.15, LOCAL_TRANSCRIBE_RANGES.cleaning_midi),
-            formatCheckpoint('pipeline:cleaning')
-          );
+          markCheckpoint('pipeline:extract-done');
         },
         onCheckpoint: markCheckpoint,
         onProgress: (progress) => report(progress),
       })
   );
 
-  // #region agent log
-  agentDebugLog(
-    'localTranscribe.ts:postBasicPitch',
-    'basic pitch returned',
-    { rawNoteCount: rawNotes.length, build: LOCAL_PIPELINE_BUILD },
-    'D',
-    'post-fix'
-  );
-  // #endregion
-
   markCheckpoint('pipeline:post-basic-pitch');
   await yieldToUi();
   report(
-    mapStageProgress('cleaning_midi', 0.1, LOCAL_TRANSCRIBE_RANGES.cleaning_midi),
-    formatCheckpoint('pipeline:midi-start')
+    mapStageProgress('cleaning_midi', 0, LOCAL_TRANSCRIBE_RANGES.cleaning_midi),
+    'pipeline:midi-start'
   );
   const pipeline = await runWithStallGuard(
     () => pipelineCheckpoint,
@@ -150,27 +129,25 @@ export async function runLocalTranscription(
       return runMidiPipeline(projectDir, rawNotes, {
         mode: params.mode,
         minVelocityRatio: params.settings?.min_velocity_ratio,
+        onProgress: (stageFraction) => {
+          report(
+            mapStageProgress('cleaning_midi', stageFraction, LOCAL_TRANSCRIBE_RANGES.cleaning_midi),
+            'pipeline:midi-run'
+          );
+        },
       });
     }
   );
-  // #region agent log
-  agentDebugLog(
-    'localTranscribe.ts:postPipeline',
-    'midi pipeline complete',
-    { outputMidPath: pipeline.outputMidPath },
-    'D',
-    'post-fix'
-  );
-  // #endregion
-  const finalNotes = await readMidiNotes(pipeline.outputMidPath);
+  const finalNotes = pipeline.notes;
   report(mapStageProgress('cleaning_midi', 1, LOCAL_TRANSCRIBE_RANGES.cleaning_midi));
+  await yieldToUi();
 
   let musicxmlPath: string | undefined;
   let musicxmlError: string | null = null;
   if (params.outputFormat === 'sheet_music' || params.outputFormat === 'both') {
     report(
       mapStageProgress('exporting_musicxml', 0, LOCAL_TRANSCRIBE_RANGES.exporting_musicxml),
-      formatCheckpoint('pipeline:musicxml')
+      'pipeline:musicxml'
     );
     params.onStep?.('exporting_musicxml');
     try {
@@ -188,7 +165,7 @@ export async function runLocalTranscription(
   if (params.outputFormat === 'chords' || params.outputFormat === 'both') {
     report(
       mapStageProgress('extracting_chords', 0, LOCAL_TRANSCRIBE_RANGES.extracting_chords),
-      formatCheckpoint('pipeline:chords')
+      'pipeline:chords'
     );
     params.onStep?.('extracting_chords');
     const chordResult = await writeChordProgression(projectDir, finalNotes);

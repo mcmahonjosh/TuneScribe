@@ -33,7 +33,7 @@ export default function ProjectsScreen() {
 
   return (
     <Screen style={styles.screen}>
-      <AppHeader title="TuneScribe" subtitle="Your transcription projects" />
+      <AppHeader title="TuneScribe" subtitle="On-device piano & vocal transcription" />
 
       <Button
         label="+ New Recording"

@@ -2,6 +2,13 @@
 
 TuneScribe uses a **custom dev client** on iPhone — the same workflow as Language Partner. Do **not** open the project in store **Expo Go** after scanning the QR code.
 
+## Offline v1
+
+The current release runs **entirely on-device** — Basic Pitch ONNX is bundled in the app. No backend server or `EXPO_PUBLIC_API_URL` is required.
+
+- **Development:** dev client + Metro (JS hot reload)
+- **Production / TestFlight:** `eas build --profile production --platform ios` bundles JS + ONNX into a standalone app
+
 ## One-time: build and install on iPhone
 
 From WSL (no Mac required), use **EAS Build**:
@@ -19,6 +26,12 @@ eas build --profile development --platform ios
 - Register your iPhone UDID if EAS asks (profile install link in Safari).
 - When the build finishes, open the **install link** on your iPhone and install the app (TuneScribe icon, not Expo Go).
 
+For a standalone offline release (no Metro):
+
+```bash
+eas build --profile production --platform ios
+```
+
 Android (optional):
 
 ```bash
@@ -27,31 +40,19 @@ eas build --profile development --platform android
 
 Install the `.apk` from the EAS dashboard link.
 
-## Daily workflow
+## Daily workflow (development)
 
-1. **Backend** (separate terminal):
-
-```bash
-cd /home/jhm359/TuneScribe/backend
-source .venv/bin/activate
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-2. **Set API URL** in `mobile/.env` to your PC’s LAN IP (not `localhost`):
-
-```env
-EXPO_PUBLIC_API_URL=http://192.168.1.42:8000
-```
-
-3. **Start Metro for the dev client**:
+1. **Start Metro for the dev client**:
 
 ```bash
 cd /home/jhm359/TuneScribe/mobile
 npm run start:dev
 ```
 
-4. Open the **TuneScribe dev app** on your phone (not Expo Go).
-5. Scan the QR code (tunnel is default; same habit as Language Partner).
+2. Open the **TuneScribe dev app** on your phone (not Expo Go).
+3. Scan the QR code (tunnel is default; same habit as Language Partner).
+
+No backend is required for offline v1.
 
 ## Scripts
 
@@ -67,34 +68,19 @@ npm run start:dev
 - You add a native module (new Expo plugin with native code).
 - You change `app.json` / `app.config.js` native settings (permissions, bundle ID, etc.).
 - You upgrade Expo SDK.
-- You enable **Local mode** for the first time (bundles `onnxruntime-react-native` and the Basic Pitch ONNX model in `assets/models/nmp.onnx`).
+- You change ONNX model assets or `onnxruntime-react-native` plugin config.
 
 JS-only changes do **not** require a rebuild — scan QR as usual.
 
-## Local processing mode
+## Manual test matrix (offline v1)
 
-The header toggle switches between **Backend** (default) and **Local**:
-
-| Feature | Backend mode | Local mode |
-|---------|--------------|------------|
-| Record → transcription | Server | On-device (Basic Pitch ONNX) |
-| Transpose MusicXML/MXL | Server | On-device |
-| Transpose PDF/photo (OMR) | Server | Server (hybrid) |
-| PDF export (MuseScore) | Server | Server |
-
-After pulling Local mode changes, rebuild:
-
-```bash
-cd /home/jhm359/TuneScribe/mobile
-eas build --profile development --platform ios
-```
-
-### Manual test matrix
-
-1. **Backend mode** — Record (piano/vocal, sheet/chords/both) and Transpose (MusicXML, PDF) unchanged.
-2. **Local mode Record** — piano/vocal with sheet, chords, and both output formats; confirm `modelUsed` is `basic-pitch-local`.
-3. **Local mode Transpose** — MusicXML transposes on device; PDF/photo shows server OMR banner and requires backend.
-4. **Offline** — Local Record and MusicXML Transpose work without backend; PDF/photo shows clear error if backend is down.
+1. **Record — piano, sheet music:** 15–30s clip → project shows sheet + MIDI + preview playback.
+2. **Record — piano, chords / both:** chord view and playback work.
+3. **Record — vocal:** monophonic sheet output.
+4. **Projects:** list, open, delete.
+5. **Export:** share MIDI, MusicXML, chords JSON.
+6. **Transpose:** `.musicxml` or `.mxl` → transposed sheet in project.
+7. **Airplane mode:** all of the above work with Wi‑Fi off.
 
 ## Troubleshooting
 
@@ -102,7 +88,7 @@ eas build --profile development --platform ios
 |-------|-----|
 | Opens in Expo Go | Use the **TuneScribe dev app** from EAS install link |
 | SDK incompatible | Rebuild dev client after SDK upgrade |
-| Transcription fails | Set `EXPO_PUBLIC_API_URL` to LAN IP; backend on `0.0.0.0:8000` |
+| Transcription hangs | Keep app in foreground; rebuild dev client if ONNX plugin missing |
 | Tunnel timeout | Use `npm run start:dev` (includes `--tunnel`) |
 | Mic denied | Settings → TuneScribe → Microphone → Allow |
 

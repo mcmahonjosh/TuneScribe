@@ -14,14 +14,12 @@ interface ProcessingStatusProps {
   processingStepLabel?: string;
   /** Overall progress 0–1 for local / staged jobs. Omit for indeterminate. */
   progressFraction?: number;
-  /** Dev-only pipeline checkpoint shown under the progress bar. */
-  debugCheckpoint?: string;
 }
 
 const DEFAULT_STATUS_LABELS: Record<ProjectStatus, string> = {
   idle: 'Ready',
   recording: 'Recording...',
-  uploading: 'Uploading audio...',
+  uploading: 'Preparing audio...',
   processing: 'Transcribing with Basic Pitch...',
   complete: 'Transcription complete',
   failed: 'Transcription failed',
@@ -33,7 +31,6 @@ export default function ProcessingStatus({
   statusLabels,
   processingStepLabel,
   progressFraction,
-  debugCheckpoint,
 }: ProcessingStatusProps) {
   const { theme } = useTheme();
   const styles = useThemedStyles((t) => ({
@@ -53,7 +50,6 @@ export default function ProcessingStatus({
       backgroundColor: t.primary,
     },
     progressText: { fontSize: 13, color: t.textMuted, textAlign: 'center' as const },
-    checkpoint: { fontSize: 11, color: t.textMuted, textAlign: 'center' as const },
     error: { fontSize: 14, color: t.error, textAlign: 'center' as const },
   }));
 
@@ -76,9 +72,6 @@ export default function ProcessingStatus({
               <View style={[styles.progressFill, { width: `${percent}%` }]} />
             </View>
             <Text style={styles.progressText}>{percent}%</Text>
-            {debugCheckpoint ? (
-              <Text style={styles.checkpoint}>{debugCheckpoint}</Text>
-            ) : null}
           </View>
         ) : null}
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}

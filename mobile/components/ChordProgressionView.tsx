@@ -277,7 +277,7 @@ const ChordProgressionView = forwardRef<ChordProgressionViewHandle, ChordProgres
               />
             </View>
           ) : data.chords.length > 0 ? (
-            <Text style={styles.previewMissing}>Re-transcribe to enable chord playback.</Text>
+            <Text style={styles.previewMissing}>Chord preview audio is not available for this project.</Text>
           ) : null}
         </View>
 

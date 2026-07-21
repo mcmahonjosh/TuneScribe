@@ -6,7 +6,7 @@ export async function isValidWavFile(uri: string | undefined): Promise<boolean> 
 
   try {
     const info = await FileSystem.getInfoAsync(uri);
-    if (!info.exists || !info.size || info.size < 12) {
+    if (!info.exists || !info.size || info.size < 44) {
       return false;
     }
 
@@ -22,10 +22,31 @@ export async function isValidWavFile(uri: string | undefined): Promise<boolean> 
   }
 }
 
+/** Poll briefly for a WAV that may still be finishing a write. */
+export async function waitForValidWavFile(
+  uri: string | undefined,
+  timeoutMs = 6000
+): Promise<boolean> {
+  if (!uri) return false;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (await isValidWavFile(uri)) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
 export async function removeInvalidPreviewWav(uri: string | undefined): Promise<void> {
   if (!uri) return;
-  const valid = await isValidWavFile(uri);
+  // Only delete after it is clearly not becoming valid (avoids races with writers).
+  const valid = await waitForValidWavFile(uri, 1500);
   if (!valid) {
-    await FileSystem.deleteAsync(uri, { idempotent: true });
+    const stillMissing = !(await isValidWavFile(uri));
+    if (stillMissing) {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+      await FileSystem.deleteAsync(`${uri}.partial`, { idempotent: true });
+    }
   }
 }

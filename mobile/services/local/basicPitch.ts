@@ -14,7 +14,6 @@ import { extractNotesMobileFast } from '@/services/local/extractNotesMobileFast'
 import { noteEventsToMidiNotes, unwrapInferenceBatches } from '@/services/local/noteCreation';
 import { LOCAL_TRANSCRIBE_RANGES, mapStageProgress, yieldToUi } from '@/services/processing/progress';
 import { type ProcessingProgressCallback } from '@/services/processing/types';
-import { agentDebugLog } from '@/utils/agentDebugLog';
 
 const MODEL_ASSET = require('../../assets/models/nmp.onnx');
 
@@ -162,18 +161,6 @@ export async function runBasicPitchOnAudio(
 
   options.onCheckpoint?.('basicpitch:unwrap');
   const matrix = unwrapInferenceBatches(batches, audio.length, N_OVERLAPPING_FRAMES);
-  // #region agent log
-  agentDebugLog(
-    'basicPitch.ts:unwrap',
-    'matrix ready',
-    {
-      batchCount: batches.length,
-      nFrames: matrix.nFrames,
-      audioSamples: audio.length,
-    },
-    'E'
-  );
-  // #endregion
   const minNoteLen = Math.max(
     1,
     Math.round(((options.minimumNoteLengthMs ?? 150) / 1000) * ANNOTATIONS_FPS)
@@ -197,26 +184,9 @@ export async function runBasicPitchOnAudio(
   );
 
   options.onCheckpoint?.('basicpitch:post-extract');
+  await yieldToUi();
+  const notes = noteEventsToMidiNotes(events, ANNOTATIONS_FPS);
   options.onExtractComplete?.();
   await yieldToUi();
-  // #region agent log
-  agentDebugLog(
-    'basicPitch.ts:preMidiNotes',
-    'before noteEventsToMidiNotes',
-    { eventCount: events.length },
-    'C',
-    'post-fix'
-  );
-  // #endregion
-  const notes = noteEventsToMidiNotes(events, ANNOTATIONS_FPS);
-  // #region agent log
-  agentDebugLog(
-    'basicPitch.ts:postMidiNotes',
-    'basic pitch complete',
-    { noteCount: notes.length },
-    'C',
-    'post-fix'
-  );
-  // #endregion
   return notes;
 }

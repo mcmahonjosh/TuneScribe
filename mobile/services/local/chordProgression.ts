@@ -56,7 +56,12 @@ function pitchesInWindow(notes: MidiNote[], start: number, end: number): number[
 export async function writeChordProgression(
   projectDir: string,
   notes: MidiNote[]
-): Promise<{ chordsPath: string; chordsPreviewWavPath: string; detectedKey: ChordKeyInfo; data: ChordProgressionData }> {
+): Promise<{
+  chordsPath: string;
+  chordsPreviewWavPath?: string;
+  detectedKey: ChordKeyInfo;
+  data: ChordProgressionData;
+}> {
   const endTime = Math.max(0.5, ...notes.map((note) => note.end));
   const key = detectKeyFromNotes(notes);
   const segments: ChordSegment[] = [];
@@ -91,6 +96,10 @@ export async function writeChordProgression(
   const chordsPath = `${projectDir}chords.json`;
   await FileSystem.writeAsStringAsync(chordsPath, JSON.stringify(data, null, 2));
   const chordsPreviewWavPath = `${projectDir}chords_preview.wav`;
-  await writeChordPreviewWav(chordsPreviewWavPath, previewSegments);
-  return { chordsPath, chordsPreviewWavPath, detectedKey: key, data };
+  try {
+    await writeChordPreviewWav(chordsPreviewWavPath, previewSegments);
+    return { chordsPath, chordsPreviewWavPath, detectedKey: key, data };
+  } catch {
+    return { chordsPath, detectedKey: key, data };
+  }
 }

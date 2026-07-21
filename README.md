@@ -1,21 +1,77 @@
 # TuneScribe
 
-AI piano/vocal to MIDI and sheet music — local MVP.
+AI piano/vocal to MIDI and sheet music — **fully offline on your phone**.
 
-Record or upload audio on your phone, send it to a local FastAPI backend running Basic Pitch, and get back MIDI + MusicXML files stored locally on the device.
+Record piano or vocal audio, transcribe on-device with Basic Pitch (ONNX), and view or share MIDI, MusicXML, and chord progressions locally. No server, no account, no cloud upload.
+
+## What offline v1 includes
+
+| Feature | Supported |
+|---------|-----------|
+| Record piano (polyphonic) or vocal (monophonic) | Yes |
+| Output: sheet music, chords, or both | Yes |
+| Transcription tuning sliders | Yes |
+| Projects list, playback, export | Yes |
+| Transpose MusicXML / MXL files | Yes |
+| PDF/photo sheet import, PDF export, backend processing | Not in v1 |
 
 ## Project structure
 
 ```text
 TuneScribe/
-  backend/     FastAPI + Basic Pitch + music21
-  mobile/      Expo React Native app
+  backend/     Optional self-hosted FastAPI (not required for offline v1)
+  mobile/      Expo React Native app with on-device Basic Pitch
   docs/        Documentation
 ```
 
-## Quick start
+## Quick start (offline v1)
 
-### 1. Backend
+### 1. Install the app
+
+See [docs/IOS_DEV_CLIENT.md](docs/IOS_DEV_CLIENT.md) for EAS dev client setup.
+
+**One-time dev build:**
+
+```bash
+cd mobile
+eas build --profile development --platform ios
+```
+
+**Production / TestFlight build (standalone, no Metro required):**
+
+```bash
+cd mobile
+eas build --profile production --platform ios
+```
+
+No `EXPO_PUBLIC_API_URL` is needed for offline v1.
+
+### 2. Daily development
+
+```bash
+cd mobile
+npm run start:dev
+```
+
+Open the **TuneScribe dev app** on your phone (not Expo Go) and scan the QR code.
+
+### 3. Verify offline
+
+Enable **airplane mode** on your iPhone, then:
+
+1. Record a 15–30 second piano clip → transcribe → open project
+2. Export MIDI or MusicXML from the project screen
+3. Transpose a `.musicxml` or `.mxl` file on the Transpose tab
+
+## Offline pipeline
+
+```text
+Record WAV → Basic Pitch ONNX (on-device) → MIDI cleanup → MusicXML / chords → SQLite + local files
+```
+
+## Future: self-hosted backend
+
+The `backend/` folder contains an optional FastAPI server (Basic Pitch, OMR, MuseScore PDF export) for a future hybrid release. It is **not required** for offline v1.
 
 ```bash
 cd backend
@@ -25,50 +81,4 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Verify: `http://localhost:8000/health`
-
-Test transcription:
-
-```bash
-python scripts/generate_test_tone.py
-curl -X POST http://localhost:8000/transcribe -F "file=@uploads/test_tone.wav"
-```
-
-### 2. Mobile app (iPhone dev client)
-
-See [docs/IOS_DEV_CLIENT.md](docs/IOS_DEV_CLIENT.md) for the full EAS / TestFlight setup (same as Language Partner).
-
-**One-time:** `cd mobile && eas init && eas build --profile development --platform ios`
-
-**Daily:**
-
-```bash
-cd mobile
-cp env.example .env   # set EXPO_PUBLIC_API_URL to your LAN IP
-npm run start:dev
-```
-
-Open the **TuneScribe dev app** on your phone (not Expo Go) and scan the QR code.
-
-## MVP pipeline
-
-```text
-Record audio → POST /transcribe → Basic Pitch → MIDI → music21 → MusicXML → save locally
-```
-
-## Optional PDF export
-
-On WSL/Ubuntu (backend PC):
-
-```bash
-bash scripts/install-musescore-wsl.sh
-```
-
-This installs MuseScore 3 + `xvfb` (needed for headless PDF export). Then restart the backend and check `GET /transpose/settings` → `musescore_available: true`.
-
-If the script cannot use `sudo`, run manually:
-
-```bash
-sudo apt-get update && sudo apt-get install -y musescore3 xvfb libnss3
-export MUSESCORE_BIN="$(command -v musescore3)"
-```
+When running the hybrid branch, set `EXPO_PUBLIC_API_URL` in `mobile/.env` — see `mobile/env.example`.

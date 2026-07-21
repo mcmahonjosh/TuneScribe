@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { OFFLINE_ONLY } from '@/constants/appConfig';
+
 const DEFAULT_WEB_API = 'http://localhost:8000';
 
 function normalizeBaseUrl(url: string): string {
@@ -22,6 +24,10 @@ function readEnvApiUrl(): string | undefined {
 }
 
 export function getApiBaseUrl(): string {
+  if (OFFLINE_ONLY) {
+    return '';
+  }
+
   const configured = readEnvApiUrl();
   if (configured) {
     return configured;

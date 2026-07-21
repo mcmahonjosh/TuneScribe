@@ -123,7 +123,7 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
     const startPlayback = useCallback(async () => {
       if (!previewWavUri) {
         updateState('error');
-        setStatusText('No preview audio — re-transcribe this recording');
+        setStatusText('No preview audio for this project');
         return;
       }
       if (!timingsRef.current.length) {
@@ -220,7 +220,7 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
           setStatusText(
             previewWavUri
               ? `Ready (${data.noteCount ?? 0} notes${polyHint})`
-              : `Ready — re-transcribe to enable audio (${data.noteCount ?? 0} notes${polyHint})`
+              : `Ready — preview audio unavailable (${data.noteCount ?? 0} notes${polyHint})`
           );
           updateState('ready');
           return;
@@ -293,8 +293,8 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
         <Text style={styles.status}>{statusText}</Text>
         {!previewWavUri && (
           <Text style={styles.warning}>
-            Audio preview unavailable for this project. Re-transpose or re-transcribe to
-            generate preview audio.
+            Sheet music is ready. Preview audio was not generated for this project — export MusicXML
+            still works.
           </Text>
         )}
         <WebView

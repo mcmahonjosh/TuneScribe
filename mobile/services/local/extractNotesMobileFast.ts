@@ -1,7 +1,5 @@
 import { MIDI_OFFSET } from '@/services/local/basicPitchConstants';
 import { type FlatModelMatrices } from '@/services/local/noteCreation';
-import { LOCAL_PIPELINE_BUILD } from '@/constants/localPipelineBuild';
-import { agentDebugLog } from '@/utils/agentDebugLog';
 
 const N_FREQS = 88;
 const MAX_NOTES = 500;
@@ -75,22 +73,11 @@ export function extractNotesMobileFast(
   onProgress?: (fraction: number) => void,
   onCheckpoint?: (checkpoint: string) => void
 ): Array<[number, number, number, number]> {
-  const started = Date.now();
   const { nFrames, frames, onsets } = matrix;
   const { onsetThresh, frameThresh, minNoteLen, minFreq = null, maxFreq = null } = options;
   const { minF, maxF } = freqBounds(minFreq, maxFreq);
 
   onCheckpoint?.('extract:entry');
-  // #region agent log
-  agentDebugLog(
-    'extractNotesMobileFast.ts:entry',
-    'extract start',
-    { nFrames, minF, maxF, minNoteLen, build: LOCAL_PIPELINE_BUILD },
-    'A',
-    'post-fix'
-  );
-  // #endregion
-
   onProgress?.(0.05);
 
   const peaks: Array<{ t: number; f: number; strength: number }> = [];
@@ -148,22 +135,6 @@ export function extractNotesMobileFast(
   }
 
   onCheckpoint?.('extract:done');
-  // #region agent log
-  agentDebugLog(
-    'extractNotesMobileFast.ts:done',
-    'extract complete',
-    {
-      nFrames,
-      peakCount: peaks.length,
-      cappedPeakCount: capped.length,
-      noteCount: noteEvents.length,
-      elapsedMs: Date.now() - started,
-    },
-    'A',
-    'post-fix'
-  );
-  // #endregion
-
   onProgress?.(1);
   return noteEvents;
 }
