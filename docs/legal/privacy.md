@@ -56,8 +56,7 @@ We may update this policy when the App’s data practices change. The “Last up
 
 ## Contact
 
-Questions about this policy: **support@tunescribe.app**  
-(Replace with your real support email before publishing.)
+Questions about this policy: **mcmahon.h.josh@gmail.com**  
 
 ---
 

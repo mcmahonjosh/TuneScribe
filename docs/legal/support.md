@@ -2,7 +2,6 @@
 
 **App:** TuneScribe (Offline v1)  
 **Contact:** mcmahon.h.josh@gmail.com  
-*(Replace with your real support email before publishing.)*
 
 ## What TuneScribe does
 
