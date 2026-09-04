@@ -5,10 +5,18 @@ import { Alert, StyleSheet, View } from 'react-native';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import RecordingControls from '@/components/RecordingControls';
 import TranscriptionSettingsPanel from '@/components/TranscriptionSettingsPanel';
-import { AppHeader, Button, Card, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
+import {
+  AppHeader,
+  Card,
+  Chip,
+  InfoBanner,
+  MutedText,
+  Screen,
+  SectionTitle,
+  SelectableTile,
+  TrustCard,
+} from '@/components/ui';
 import { useProcessingMode } from '@/context/ProcessingModeContext';
-import { checkHealthDetailed } from '@/services/api';
-import { getApiBaseUrl } from '@/utils/apiConfig';
 import {
   playAudio,
   requestRecordingPermissions,
@@ -48,56 +56,38 @@ export default function RecordScreen() {
     () => defaultSettingsForInputType('piano')
   );
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
-  const [backendStatus, setBackendStatus] = useState<string>('Not tested');
 
   const now = () => new Date().toISOString();
-  const apiBase = getApiBaseUrl();
 
   const PIANO_OUTPUT_OPTIONS: {
     id: PianoOutputFormat;
     label: string;
     hint: string;
+    icon: string;
   }[] = [
     {
       id: 'sheet_music',
-      label: 'Sheet music',
+      label: 'Sheet Music',
       hint: 'Full note-for-note notation (current behavior).',
+      icon: 'music.note',
     },
     {
       id: 'chords',
-      label: 'Chord progression',
+      label: 'Chord Progression',
       hint: 'Estimates the song’s chords — a good overview, not every note.',
+      icon: 'square.stack',
     },
     {
       id: 'both',
       label: 'Both',
       hint: 'Generate notation and chords; switch views after transcribing.',
+      icon: 'sparkles',
     },
   ];
 
   useEffect(() => {
     setTranscriptionSettings(defaultSettingsForInputType(inputType));
   }, [inputType]);
-
-  async function handleTestBackend() {
-    const result = await checkHealthDetailed();
-    if (result.ok) {
-      setBackendStatus(`OK (${result.status})`);
-      Alert.alert('Backend connected', `${result.url}\n\n${result.body ?? ''}`);
-      return;
-    }
-    setBackendStatus('Failed');
-    Alert.alert(
-      'Backend unreachable',
-      `URL: ${result.url}\n` +
-        (result.status ? `HTTP ${result.status}\n` : '') +
-        (result.error ? `Error: ${result.error}\n\n` : '\n') +
-        'Safari works but the app does not?\n' +
-        '→ iPhone Settings → TuneScribe → enable Local Network\n' +
-        '→ Settings → Privacy → Local Network → TuneScribe ON\n\n' +
-        'Then restart the app and tap Test Backend again.'
-    );
-  }
 
   async function handleStart() {
     const granted = await requestRecordingPermissions();
@@ -215,45 +205,42 @@ export default function RecordScreen() {
       <AppHeader title="New Recording" subtitle="Record 15–60 seconds of solo piano or vocal audio." />
 
       {isLocalMode ? (
-        <Card style={styles.section}>
-          <MutedText>
-            Local mode runs Basic Pitch on your phone. Keep the app open while processing. Falls
-            back to the backend if on-device transcription fails.
-          </MutedText>
-        </Card>
+        <InfoBanner>
+          Processing runs entirely on your device. Keep the app open while transcribing.
+        </InfoBanner>
       ) : null}
 
-      <Card style={styles.section}>
-        <MutedText style={styles.mono}>Backend: {apiBase}</MutedText>
-        <MutedText>Status: {backendStatus}</MutedText>
-        <Button label="Test Backend" variant="secondary" onPress={handleTestBackend} />
-      </Card>
-
       <View style={styles.chipRow}>
-        {(['piano', 'vocal'] as const).map((type) => (
-          <Chip
-            key={type}
-            label={type === 'piano' ? 'Piano' : 'Vocal'}
-            selected={inputType === type}
-            onPress={() => setInputType(type)}
-            disabled={isRecording || isSubmitting}
-            style={styles.flexChip}
-          />
-        ))}
+        <Chip
+          label="Piano"
+          icon="music.note"
+          selected={inputType === 'piano'}
+          onPress={() => setInputType('piano')}
+          disabled={isRecording || isSubmitting}
+          style={styles.flexChip}
+        />
+        <Chip
+          label="Vocal"
+          icon="mic.fill"
+          selected={inputType === 'vocal'}
+          onPress={() => setInputType('vocal')}
+          disabled={isRecording || isSubmitting}
+          style={styles.flexChip}
+        />
       </View>
 
       {inputType === 'piano' && (
         <Card style={styles.section}>
-          <SectionTitle>Piano output</SectionTitle>
-          <View style={styles.chipRow}>
+          <SectionTitle>Output</SectionTitle>
+          <View style={styles.tileRow}>
             {PIANO_OUTPUT_OPTIONS.map((option) => (
-              <Chip
+              <SelectableTile
                 key={option.id}
                 label={option.label}
+                icon={option.icon}
                 selected={pianoOutputFormat === option.id}
                 onPress={() => setPianoOutputFormat(option.id)}
                 disabled={isRecording || isSubmitting}
-                style={styles.flexChip}
               />
             ))}
           </View>
@@ -293,14 +280,16 @@ export default function RecordScreen() {
           isSubmitting={isSubmitting}
         />
       )}
+
+      <TrustCard />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: { gap: 16, paddingBottom: 40 },
-  section: { gap: 8 },
-  mono: { fontSize: 12 },
+  section: { gap: 10 },
   chipRow: { flexDirection: 'row', gap: 10 },
+  tileRow: { flexDirection: 'row', gap: 10 },
   flexChip: { flex: 1 },
 });

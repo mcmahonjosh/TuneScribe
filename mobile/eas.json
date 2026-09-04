@@ -7,6 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "development"
+      },
       "node": "20.19.4",
       "ios": {
         "simulator": false
@@ -16,6 +19,9 @@
       }
     },
     "production": {
+      "env": {
+        "APP_VARIANT": "production"
+      },
       "node": "20.19.4",
       "ios": {
         "simulator": false

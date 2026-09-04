@@ -1,34 +1,33 @@
-import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
 import { useTheme } from '@/context/ThemeContext';
 
-interface ChipProps {
+interface SelectableTileProps {
   label: string;
+  icon: string;
   selected?: boolean;
   onPress?: () => void;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
-  icon?: string;
 }
 
-export default function Chip({
+export default function SelectableTile({
   label,
+  icon,
   selected = false,
   onPress,
   disabled,
   style,
-  icon,
-}: ChipProps) {
+}: SelectableTileProps) {
   const { theme } = useTheme();
-  const iconColor = selected ? theme.chipTextActive : theme.chipText;
 
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.chip,
+        styles.tile,
         {
-          backgroundColor: selected ? theme.chipBackgroundActive : theme.chipBackground,
+          backgroundColor: selected ? theme.banner : theme.surface,
           borderColor: selected ? theme.primary : theme.border,
           opacity: disabled ? 0.45 : pressed ? 0.85 : 1,
         },
@@ -36,12 +35,18 @@ export default function Chip({
       ]}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled }}
     >
-      {icon ? <SymbolView name={icon as 'mic.fill'} tintColor={iconColor} size={16} /> : null}
+      <SymbolView
+        name={icon as 'music.note'}
+        tintColor={selected ? theme.primary : theme.textMuted}
+        size={22}
+      />
       <Text
         style={[
           styles.label,
-          { color: selected ? theme.chipTextActive : theme.chipText },
+          { color: selected ? theme.text : theme.textMuted },
         ]}
       >
         {label}
@@ -51,15 +56,21 @@ export default function Chip({
 }
 
 const styles = StyleSheet.create({
-  chip: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+  tile: {
+    flex: 1,
+    minHeight: 92,
+    borderRadius: 16,
     borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
     gap: 8,
   },
-  label: { fontWeight: '600', fontSize: 13, textAlign: 'center' },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
 });

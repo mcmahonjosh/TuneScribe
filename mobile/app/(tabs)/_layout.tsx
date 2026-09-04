@@ -2,9 +2,10 @@ import { SymbolView } from 'expo-symbols';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { RaisedTabButton } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 
-type TabIconName = 'music.note.list' | 'mic.fill' | 'arrow.up.arrow.down';
+type TabIconName = 'folder.fill' | 'mic.fill' | 'arrow.up.arrow.down';
 
 export default function TabLayout() {
   const { theme } = useTheme();
@@ -19,9 +20,13 @@ export default function TabLayout() {
           backgroundColor: theme.tabBar,
           borderTopColor: theme.tabBarBorder,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
+          height: Platform.OS === 'ios' ? 88 : 72,
           paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          overflow: 'visible',
+        },
+        tabBarItemStyle: {
+          overflow: 'visible',
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -34,7 +39,7 @@ export default function TabLayout() {
         options={{
           title: 'Projects',
           tabBarIcon: ({ color }) => (
-            <SymbolView name={'music.note.list' as TabIconName} tintColor={color} size={24} />
+            <SymbolView name={'folder.fill' as TabIconName} tintColor={color} size={24} />
           ),
         }}
       />
@@ -42,9 +47,9 @@ export default function TabLayout() {
         name="record"
         options={{
           title: 'Record',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={'mic.fill' as TabIconName} tintColor={color} size={24} />
-          ),
+          tabBarLabel: () => null,
+          tabBarIcon: () => null,
+          tabBarButton: (props) => <RaisedTabButton {...props} />,
         }}
       />
       <Tabs.Screen

@@ -48,13 +48,17 @@ function buildExceptionDomains() {
 }
 
 const base = appJson.expo;
+const isDev = process.env.APP_VARIANT !== 'production';
 
 module.exports = {
     expo: {
         ...base,
+        name: isDev ? 'TuneScribe Dev' : base.name,
+        scheme: isDev ? 'tunescribe-dev' : base.scheme,
         plugins: [...(base.plugins || []), './plugins/withIosDevHttp'],
         ios: {
             ...base.ios,
+            bundleIdentifier: isDev ? 'com.tunescribe.app.dev' : base.ios?.bundleIdentifier,
             infoPlist: {
                 ...base.ios?.infoPlist,
                 NSLocalNetworkUsageDescription:
@@ -69,6 +73,7 @@ module.exports = {
         },
         android: {
             ...base.android,
+            package: isDev ? 'com.tunescribe.app.dev' : base.android?.package,
             usesCleartextTraffic: true,
         },
         owner: 'wizard10fun',

@@ -31,16 +31,23 @@ export default function RecordingControls({
   return (
     <View style={styles.container}>
       {!isRecording ? (
-        <Button label="Start Recording" variant="danger" onPress={onStart} />
+        <Button label="Start Recording" icon="mic.fill" onPress={onStart} />
       ) : (
-        <Button label="Stop Recording" variant="secondary" onPress={onStop} />
+        <Button label="Stop Recording" variant="secondary" icon="stop.fill" onPress={onStop} />
       )}
 
       {hasRecording && !isRecording && (
         <View style={styles.row}>
-          <Button label="Play Back" variant="ghost" onPress={onPlayback} style={styles.flex} />
+          <Button
+            label="Play Back"
+            variant="ghost"
+            icon="play.fill"
+            onPress={onPlayback}
+            style={styles.flex}
+          />
           <Button
             label={isSubmitting ? 'Processing...' : 'Transcribe'}
+            icon="music.note"
             onPress={onSubmit}
             disabled={isSubmitting}
             style={styles.flex}

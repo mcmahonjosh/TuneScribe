@@ -1,9 +1,10 @@
+import { SymbolView } from 'expo-symbols';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import SwipeableProjectRow from '@/components/SwipeableProjectRow';
-import { AppHeader, Button, MutedText, Screen } from '@/components/ui';
+import { AppHeader, MutedText, Screen, TrustCard } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { deleteProjectFiles } from '@/services/files';
 import { deleteProject, listProjects } from '@/storage/projectRepository';
@@ -31,15 +32,37 @@ export default function ProjectsScreen() {
     setProjects((current) => current.filter((entry) => entry.id !== project.id));
   }, []);
 
+  const openRecord = useCallback(() => {
+    router.push('/(tabs)/record');
+  }, [router]);
+
   return (
     <Screen style={styles.screen}>
-      <AppHeader title="TuneScribe" subtitle="Your transcription projects" />
+      <AppHeader title="TuneScribe" subtitle="On-device piano & vocal transcription" />
 
-      <Button
-        label="+ New Recording"
-        onPress={() => router.push('/(tabs)/record')}
-        style={styles.newButton}
-      />
+      <Pressable
+        onPress={openRecord}
+        style={({ pressed }) => [
+          styles.hero,
+          { backgroundColor: theme.primary, opacity: pressed ? 0.88 : 1 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="New Recording"
+      >
+        <View style={[styles.heroIcon, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+          <SymbolView name={'mic.fill' as 'mic.fill'} tintColor={theme.primaryText} size={22} />
+        </View>
+        <View style={styles.heroText}>
+          <Text style={[styles.heroTitle, { color: theme.primaryText }]}>+ New Recording</Text>
+          <Text style={[styles.heroSubtitle, { color: theme.primaryText }]}>
+            Piano or vocal transcription
+          </Text>
+        </View>
+      </Pressable>
+
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Projects</Text>
+      </View>
 
       <FlatList
         data={projects}
@@ -49,7 +72,7 @@ export default function ProjectsScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <MutedText style={[styles.empty, { color: theme.textMuted }]}>
-            No projects yet. Record a piano or vocal clip to get started.
+            Record a piano or vocal clip to turn it into sheet music or chords.
           </MutedText>
         }
         renderItem={({ item }) => (
@@ -59,6 +82,7 @@ export default function ProjectsScreen() {
             onDelete={handleDeleteProject}
           />
         )}
+        ListFooterComponent={<TrustCard style={styles.trust} />}
       />
     </Screen>
   );
@@ -66,8 +90,34 @@ export default function ProjectsScreen() {
 
 const styles = StyleSheet.create({
   screen: { paddingBottom: 0, flex: 1 },
-  newButton: { marginBottom: 16 },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    marginBottom: 22,
+  },
+  heroIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroText: { flex: 1, gap: 2 },
+  heroTitle: { fontSize: 18, fontWeight: '700' },
+  heroSubtitle: { fontSize: 13, opacity: 0.85 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700' },
   listFlex: { flex: 1 },
   list: { paddingBottom: 24 },
-  empty: { textAlign: 'center', marginTop: 40, fontSize: 15 },
+  empty: { textAlign: 'center', marginTop: 28, marginBottom: 8, fontSize: 15, lineHeight: 22 },
+  trust: { marginTop: 8 },
 });

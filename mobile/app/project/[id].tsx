@@ -14,7 +14,7 @@ import SheetMusicPlayer, {
   SheetMusicPlayerHandle,
   SheetPlaybackState,
 } from '@/components/SheetMusicPlayer';
-import { Button, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
+import { Button, Card, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useThemedStyles } from '@/hooks/useThemedStyles';
 import { getFileDownloadUrl } from '@/services/api';
@@ -40,22 +40,23 @@ export default function ProjectDetailScreen() {
   const chordPlayerRef = useRef<ChordProgressionViewHandle>(null);
   const { theme } = useTheme();
   const styles = useThemedStyles((t) => ({
-    title: { fontSize: 22, fontWeight: '700' as const, color: t.text, marginBottom: 8 },
+    title: { fontSize: 22, fontWeight: '700' as const, color: t.text },
     keyBanner: {
       backgroundColor: t.banner,
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 12,
-      marginTop: 8,
       borderWidth: 1,
       borderColor: t.border,
     },
     keyBannerText: { fontSize: 15, fontWeight: '600' as const, color: t.bannerText, textAlign: 'center' as const },
-    compareHint: { fontSize: 14, color: t.textMuted, marginTop: 4, lineHeight: 20 },
-    actions: { gap: 10, marginTop: 16 },
-    previewSection: { marginTop: 24, gap: 12 },
-    viewToggleRow: { flexDirection: 'row' as const, gap: 8, marginBottom: 4 },
+    compareHint: { fontSize: 13, color: t.textMuted, lineHeight: 19 },
+    card: { gap: 12 },
+    actions: { gap: 10 },
+    exportRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 10 },
+    exportButton: { flexGrow: 1, minWidth: '46%' as const },
+    viewToggleRow: { flexDirection: 'row' as const, gap: 8 },
     viewChip: { flex: 1 },
-    meta: { marginTop: 16, color: t.textMuted, fontSize: 13 },
+    meta: { color: t.textMuted, fontSize: 13 },
     centered: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
   }));
 
@@ -366,6 +367,18 @@ export default function ProjectDetailScreen() {
     Boolean(project.previewWavPath) &&
     project.inputType !== 'sheet' &&
     (hasSheet || project.pianoOutputFormat !== 'chords');
+  const hasPlayback =
+    Boolean(project.audioPath) ||
+    (hasChords && project.inputType !== 'sheet') ||
+    showNotePreview ||
+    sheetIsActive ||
+    chordIsActive;
+  const hasExports =
+    Boolean(project.midiPath) ||
+    Boolean(project.musicxmlPath) ||
+    Boolean(project.chordsPath) ||
+    Boolean(project.pdfPath) ||
+    project.inputType === 'sheet';
 
   return (
     <Screen scroll contentContainerStyle={{ gap: 16, paddingBottom: 40 }}>
@@ -382,80 +395,97 @@ export default function ProjectDetailScreen() {
             </View>
           )}
 
-          {project.inputType !== 'sheet' && (
-            <Text style={styles.compareHint}>
-              {hasChords
-                ? 'Play Chords for block-chord playback with highlights. Play Notes plays every transcribed note.'
-                : 'Play Original to hear your recording. Use Play in the Sheet Music section for audio with note highlights, or Play Notes for audio only.'}
-            </Text>
-          )}
-
-          <View style={styles.actions}>
-            {project.audioPath && (
-              <Button label="Play Original" onPress={handlePlayOriginal} />
-            )}
-            {hasChords && project.inputType !== 'sheet' && (
-              <Button label="▶ Play Chords" onPress={() => void handlePlayChords()} />
-            )}
-            {chordIsPlaying && (
-              <Button label="⏸ Pause Chords" variant="warning" onPress={() => void handlePauseChords()} />
-            )}
-            {chordIsPaused && (
-              <Button label="▶ Resume Chords" onPress={() => void handleResumeChords()} />
-            )}
-            {chordIsActive && (
-              <Button label="■ Stop Chords" variant="secondary" onPress={() => void handleStopChords()} />
-            )}
-            {showNotePreview && (
-              <Button label="▶ Play Notes" variant="success" onPress={handlePlayPreview} />
-            )}
-            {sheetIsPlaying && (
-              <Button label="⏸ Pause Sheet" variant="warning" onPress={handlePauseSheetMusic} />
-            )}
-            {sheetIsPaused && (
-              <Button label="▶ Resume Sheet" variant="success" onPress={handleResumeSheetMusic} />
-            )}
-            {sheetIsActive && (
-              <Button label="■ Stop Sheet" variant="secondary" onPress={handleStopSheetMusic} />
-            )}
-            {project.midiPath && (
-              <Button label="Export MIDI" variant="secondary" onPress={() => shareFile(project.midiPath, 'MIDI')} />
-            )}
-            {project.musicxmlPath && (
-              <Button
-                label="Export MusicXML"
-                variant="secondary"
-                onPress={() => shareFile(project.musicxmlPath, 'MusicXML')}
-              />
-            )}
-            {project.chordsPath && (
-              <Button
-                label="Export Chords"
-                variant="secondary"
-                onPress={() => shareFile(project.chordsPath, 'Chords JSON')}
-              />
-            )}
-            {(project.pdfPath || project.inputType === 'sheet') && (
-              <Button
-                label={project.pdfPath ? 'Export PDF' : 'Download PDF'}
-                variant="secondary"
-                onPress={handleExportPdf}
-              />
-            )}
-          </View>
+          {hasPlayback ? (
+          <Card style={styles.card}>
+            <SectionTitle>Playback</SectionTitle>
+            {project.inputType !== 'sheet' ? (
+              <Text style={styles.compareHint}>
+                {hasChords
+                  ? 'Play Chords for block-chord playback with highlights. Play Notes plays every transcribed note.'
+                  : 'Play Original to hear your recording. Use Play in the Sheet Music section for audio with note highlights, or Play Notes for audio only.'}
+              </Text>
+            ) : null}
+            <View style={styles.actions}>
+              {project.audioPath && (
+                <Button label="Play Original" icon="play.fill" onPress={handlePlayOriginal} />
+              )}
+              {hasChords && project.inputType !== 'sheet' && (
+                <Button label="Play Chords" icon="play.fill" onPress={() => void handlePlayChords()} />
+              )}
+              {chordIsPlaying && (
+                <Button
+                  label="Pause Chords"
+                  variant="warning"
+                  icon="pause.fill"
+                  onPress={() => void handlePauseChords()}
+                />
+              )}
+              {chordIsPaused && (
+                <Button
+                  label="Resume Chords"
+                  icon="play.fill"
+                  onPress={() => void handleResumeChords()}
+                />
+              )}
+              {chordIsActive && (
+                <Button
+                  label="Stop Chords"
+                  variant="secondary"
+                  icon="stop.fill"
+                  onPress={() => void handleStopChords()}
+                />
+              )}
+              {showNotePreview && (
+                <Button
+                  label="Play Notes"
+                  variant="success"
+                  icon="play.fill"
+                  onPress={handlePlayPreview}
+                />
+              )}
+              {sheetIsPlaying && (
+                <Button
+                  label="Pause Sheet"
+                  variant="warning"
+                  icon="pause.fill"
+                  onPress={handlePauseSheetMusic}
+                />
+              )}
+              {sheetIsPaused && (
+                <Button
+                  label="Resume Sheet"
+                  variant="success"
+                  icon="play.fill"
+                  onPress={handleResumeSheetMusic}
+                />
+              )}
+              {sheetIsActive && (
+                <Button
+                  label="Stop Sheet"
+                  variant="secondary"
+                  icon="stop.fill"
+                  onPress={handleStopSheetMusic}
+                />
+              )}
+            </View>
+          </Card>
+          ) : null}
 
           {(hasChords || hasSheet) && (
-            <View style={styles.previewSection}>
+            <Card style={styles.card}>
+              <SectionTitle>Preview</SectionTitle>
               {showViewToggle && (
                 <View style={styles.viewToggleRow}>
                   <Chip
                     label="Chords"
+                    icon="square.stack"
                     selected={detailView === 'chords'}
                     onPress={() => setDetailView('chords')}
                     style={styles.viewChip}
                   />
                   <Chip
                     label="Sheet music"
+                    icon="music.note"
                     selected={detailView === 'sheet'}
                     onPress={() => setDetailView('sheet')}
                     style={styles.viewChip}
@@ -464,31 +494,69 @@ export default function ProjectDetailScreen() {
               )}
 
               {hasChords && (detailView === 'chords' || !hasSheet) && chordData && (
-                <>
-                  <SectionTitle>Chord Progression</SectionTitle>
-                  <ChordProgressionView
-                    ref={chordPlayerRef}
-                    data={chordData}
-                    previewUri={project.chordsPreviewWavPath}
-                    onPlaybackStateChange={setChordPlaybackState}
-                  />
-                </>
+                <ChordProgressionView
+                  ref={chordPlayerRef}
+                  data={chordData}
+                  previewUri={project.chordsPreviewWavPath}
+                  onPlaybackStateChange={setChordPlaybackState}
+                />
               )}
 
               {hasSheet && (detailView === 'sheet' || !hasChords) && musicxmlContent && (
-                <>
-                  <SectionTitle>Sheet Music</SectionTitle>
-                  <SheetMusicPlayer
-                    ref={sheetPlayerRef}
-                    musicxmlContent={musicxmlContent}
-                    midiBase64={midiBase64}
-                    previewWavUri={project.previewWavPath}
-                    onPlaybackStateChange={setSheetPlaybackState}
-                  />
-                </>
+                <SheetMusicPlayer
+                  ref={sheetPlayerRef}
+                  musicxmlContent={musicxmlContent}
+                  midiBase64={midiBase64}
+                  previewWavUri={project.previewWavPath}
+                  onPlaybackStateChange={setSheetPlaybackState}
+                />
+              )}
+            </Card>
+          )}
+
+          {hasExports ? (
+          <Card style={styles.card}>
+            <SectionTitle>Export</SectionTitle>
+            <View style={styles.exportRow}>
+              {project.midiPath && (
+                <Button
+                  label="MIDI"
+                  variant="secondary"
+                  icon="square.and.arrow.up"
+                  onPress={() => shareFile(project.midiPath, 'MIDI')}
+                  style={styles.exportButton}
+                />
+              )}
+              {project.musicxmlPath && (
+                <Button
+                  label="MusicXML"
+                  variant="secondary"
+                  icon="square.and.arrow.up"
+                  onPress={() => shareFile(project.musicxmlPath, 'MusicXML')}
+                  style={styles.exportButton}
+                />
+              )}
+              {project.chordsPath && (
+                <Button
+                  label="Chords"
+                  variant="secondary"
+                  icon="square.and.arrow.up"
+                  onPress={() => shareFile(project.chordsPath, 'Chords JSON')}
+                  style={styles.exportButton}
+                />
+              )}
+              {(project.pdfPath || project.inputType === 'sheet') && (
+                <Button
+                  label={project.pdfPath ? 'PDF' : 'Download PDF'}
+                  variant="secondary"
+                  icon="square.and.arrow.up"
+                  onPress={handleExportPdf}
+                  style={styles.exportButton}
+                />
               )}
             </View>
-          )}
+          </Card>
+          ) : null}
 
           {(project.modelUsed || project.transcriptionMode || project.detectedKey) && (
             <Text style={styles.meta}>
@@ -504,7 +572,7 @@ export default function ProjectDetailScreen() {
         </>
       )}
 
-      <Button label="Delete Project" variant="danger" onPress={handleDelete} style={{ marginTop: 16 }} />
+      <Button label="Delete Project" variant="danger" onPress={handleDelete} />
     </Screen>
   );
 }

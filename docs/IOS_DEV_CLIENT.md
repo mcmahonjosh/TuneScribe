@@ -17,7 +17,7 @@ eas build --profile development --platform ios
 
 - Choose **internal distribution** when prompted.
 - Register your iPhone UDID if EAS asks (profile install link in Safari).
-- When the build finishes, open the **install link** on your iPhone and install the app (TuneScribe icon, not Expo Go).
+- When the build finishes, open the **install link** on your iPhone and install **TuneScribe Dev** (not the store TuneScribe app, and not Expo Go). The two apps can sit side by side.
 
 Android (optional):
 
@@ -50,7 +50,7 @@ cd /home/jhm359/TuneScribe/mobile
 npm run start:dev
 ```
 
-4. Open the **TuneScribe dev app** on your phone (not Expo Go).
+4. Open **TuneScribe Dev** on your phone (not the store TuneScribe app, and not Expo Go).
 5. Scan the QR code (tunnel is default; same habit as Language Partner).
 
 ## Scripts
@@ -100,7 +100,7 @@ eas build --profile development --platform ios
 
 | Issue | Fix |
 |-------|-----|
-| Opens in Expo Go | Use the **TuneScribe dev app** from EAS install link |
+| Opens in Expo Go or the store TuneScribe app | Install **TuneScribe Dev** from the EAS development-profile link (`com.tunescribe.app.dev`) |
 | SDK incompatible | Rebuild dev client after SDK upgrade |
 | Transcription fails | Set `EXPO_PUBLIC_API_URL` to LAN IP; backend on `0.0.0.0:8000` |
 | Tunnel timeout | Use `npm run start:dev` (includes `--tunnel`) |

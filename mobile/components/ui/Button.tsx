@@ -1,3 +1,4 @@
+import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -11,6 +12,7 @@ interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  icon?: string;
 }
 
 function variantColors(theme: AppTheme, variant: ButtonVariant) {
@@ -36,6 +38,7 @@ export default function Button({
   variant = 'primary',
   disabled = false,
   style,
+  icon,
 }: ButtonProps) {
   const { theme } = useTheme();
   const colors = variantColors(theme, variant);
@@ -54,6 +57,9 @@ export default function Button({
       onPress={onPress}
       disabled={disabled}
     >
+      {icon ? (
+        <SymbolView name={icon as 'mic.fill'} tintColor={colors.text} size={18} />
+      ) : null}
       <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
     </Pressable>
   );
@@ -63,10 +69,12 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   label: { fontSize: 15, fontWeight: '600' },
 });

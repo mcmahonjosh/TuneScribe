@@ -107,7 +107,12 @@ export default function SwipeableProjectRow({
         style={[styles.row, { backgroundColor: theme.background, transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
-        <ProjectCard project={project} onPress={onPress} style={styles.card} />
+        <ProjectCard
+          project={project}
+          onPress={onPress}
+          onDelete={handleDeletePress}
+          style={styles.card}
+        />
       </Animated.View>
     </View>
   );
@@ -116,7 +121,7 @@ export default function SwipeableProjectRow({
 const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 12,
-    borderRadius: 14,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   deleteAction: {

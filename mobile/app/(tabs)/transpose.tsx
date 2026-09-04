@@ -9,14 +9,16 @@ import {
   AppHeader,
   Button,
   Card,
-  Chip,
+  InfoBanner,
   MutedText,
   Screen,
   SectionTitle,
+  SelectableTile,
+  TrustCard,
 } from '@/components/ui';
 import { useProcessingMode } from '@/context/ProcessingModeContext';
 import { useTheme } from '@/context/ThemeContext';
-import { checkHealthDetailed, getTransposeSettings } from '@/services/api';
+import { getTransposeSettings } from '@/services/api';
 import { saveFileToProject } from '@/services/files';
 import { transposeProject } from '@/services/processing/transposeProject';
 import { isOmrInputFilename, PROCESSING_STEP_LABELS, type ProcessingStep } from '@/services/processing/types';
@@ -24,7 +26,6 @@ import { pickSheetWithDocumentPicker, validateSheetName } from '@/services/sheet
 import { saveProject, updateProjectStatus } from '@/storage/projectRepository';
 import { Project, ProjectStatus } from '@/types/project';
 import { DEFAULT_TARGET_KEY, OmrEngine, TargetKey } from '@/types/transpose';
-import { getApiBaseUrl } from '@/utils/apiConfig';
 
 function createProjectId(): string {
   return `project_${Date.now()}`;
@@ -41,21 +42,22 @@ export default function TransposeScreen() {
   const [targetKey, setTargetKey] = useState<TargetKey>(DEFAULT_TARGET_KEY);
   const [status, setStatus] = useState<ProjectStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
-  const [backendStatus, setBackendStatus] = useState<string>('Not tested');
   const [omrEngine, setOmrEngine] = useState<OmrEngine>('audiveris');
   const [audiverisAvailable, setAudiverisAvailable] = useState<boolean | null>(null);
   const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
 
-  const OMR_OPTIONS: { id: OmrEngine; label: string; hint: string }[] = [
+  const OMR_OPTIONS: { id: OmrEngine; label: string; hint: string; icon: string }[] = [
     {
       id: 'audiveris',
       label: 'Faster model',
       hint: 'Best for clean PDF scans — higher accuracy and usually finishes in about a minute. Not as good at reading phone photos.',
+      icon: 'hare',
     },
     {
       id: 'oemer',
       label: 'Slower model',
       hint: 'Better for photos, including slightly blurry or angled shots. Takes about 2–3 minutes but handles difficult images more reliably.',
+      icon: 'tortoise',
     },
   ];
 
@@ -66,21 +68,8 @@ export default function TransposeScreen() {
   }, []);
 
   const now = () => new Date().toISOString();
-  const apiBase = getApiBaseUrl();
   const isSubmitting = status === 'uploading' || status === 'processing';
   const isPhotoInput = sheetName ? /\.(jpe?g|png|webp)$/i.test(sheetName) : false;
-
-  async function handleTestBackend() {
-    const result = await checkHealthDetailed();
-    if (result.ok) {
-      setBackendStatus(`OK (${result.status})`);
-      Alert.alert('Backend connected', `${result.url}\n\n${result.body ?? ''}`);
-      return;
-    }
-
-    setBackendStatus('Failed');
-    Alert.alert('Backend unreachable', `${result.url}\n${result.error ?? ''}`);
-  }
 
   async function handlePickSheet() {
     const result = await pickSheetWithDocumentPicker();
@@ -189,29 +178,27 @@ export default function TransposeScreen() {
       />
 
       {isLocalMode ? (
-        <Card style={styles.section}>
-          <MutedText>
-            Local mode transposes MusicXML/MXL on your phone. PDF and photo uploads still use the
-            backend for sheet reading (OMR).
-          </MutedText>
-        </Card>
+        <InfoBanner>
+          Local mode transposes MusicXML/MXL on your phone. PDF and photo uploads still use the
+          backend for sheet reading.
+        </InfoBanner>
       ) : null}
 
       <Card style={styles.section}>
         <SectionTitle>Sheet reading model</SectionTitle>
         <MutedText subtle>Only used for PDFs and photos. MusicXML uploads skip this step.</MutedText>
-        <View style={styles.chipRow}>
+        <View style={styles.tileRow}>
           {OMR_OPTIONS.map((option) => {
             const disabled =
               isSubmitting || (option.id === 'audiveris' && audiverisAvailable === false);
             return (
-              <Chip
+              <SelectableTile
                 key={option.id}
                 label={option.label}
+                icon={option.icon}
                 selected={omrEngine === option.id}
                 onPress={() => setOmrEngine(option.id)}
                 disabled={disabled}
-                style={styles.flexChip}
               />
             );
           })}
@@ -231,20 +218,17 @@ export default function TransposeScreen() {
         )}
       </Card>
 
-      <Card style={styles.section}>
-        <MutedText style={styles.mono}>Backend: {apiBase}</MutedText>
-        <MutedText>Status: {backendStatus}</MutedText>
-        <Button label="Test Backend" variant="secondary" onPress={handleTestBackend} />
-      </Card>
-
       <Button
         label={sheetName ? `Selected: ${sheetName}` : 'Choose sheet music file'}
         variant="ghost"
+        icon="doc.fill"
         onPress={handlePickSheet}
         disabled={isSubmitting}
       />
 
-      <KeyPicker value={targetKey} onChange={setTargetKey} disabled={isSubmitting} />
+      <Card style={styles.section}>
+        <KeyPicker value={targetKey} onChange={setTargetKey} disabled={isSubmitting} />
+      </Card>
 
       {isSubmitting ? (
         <ProcessingStatus
@@ -265,11 +249,13 @@ export default function TransposeScreen() {
       {!isSubmitting ? (
         <Button
           label={status === 'failed' ? 'Try again' : 'Transpose'}
-          variant="success"
+          icon="arrow.up.arrow.down"
           onPress={handleSubmit}
           disabled={!sheetUri}
         />
       ) : null}
+
+      <TrustCard />
       <SheetFilePickerModal
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
@@ -282,10 +268,8 @@ export default function TransposeScreen() {
 
 const styles = StyleSheet.create({
   container: { gap: 16, paddingBottom: 40 },
-  section: { gap: 8 },
-  mono: { fontSize: 12 },
-  chipRow: { flexDirection: 'row', gap: 10 },
-  flexChip: { flex: 1 },
+  section: { gap: 10 },
+  tileRow: { flexDirection: 'row', gap: 10 },
   warning: { fontSize: 12, lineHeight: 17 },
   errorTitle: { fontSize: 15, fontWeight: '700' },
   errorMessage: { fontSize: 13, lineHeight: 18 },
