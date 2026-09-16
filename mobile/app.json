@@ -2,13 +2,14 @@
   "expo": {
     "name": "TuneScribe",
     "slug": "tunescribe",
-    "version": "1.0.0",
-    "orientation": "portrait",
+    "version": "1.1.0",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "tunescribe",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": true,
       "bundleIdentifier": "com.tunescribe.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "TuneScribe needs microphone access to record piano and vocal performances for transcription."
@@ -38,6 +39,12 @@
       "expo-router",
       "expo-document-picker",
       "onnxruntime-react-native",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ],
       [
         "expo-splash-screen",
         {

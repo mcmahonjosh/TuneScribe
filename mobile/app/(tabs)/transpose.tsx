@@ -9,6 +9,7 @@ import {
   AppHeader,
   Button,
   Card,
+  InfoBanner,
   MutedText,
   Screen,
 } from '@/components/ui';
@@ -142,21 +143,22 @@ export default function TransposeScreen() {
         subtitle="Upload a MusicXML or MXL file to transpose to a new key on your device."
       />
 
-      <Card style={styles.section}>
-        <MutedText>
-          Use a MusicXML file (.musicxml, .xml, or .mxl). From a recording project, tap Export
-          MusicXML and save to Files — not Export MIDI. MIDI cannot be transposed in offline v1.
-        </MutedText>
-      </Card>
+      <InfoBanner>
+        Use a MusicXML file (.musicxml, .xml, or .mxl). From a recording project, tap Export
+        MusicXML and save to Files — not Export MIDI. MIDI cannot be transposed in offline v1.
+      </InfoBanner>
 
       <Button
         label={sheetName ? `Selected: ${sheetName}` : 'Choose MusicXML file'}
         variant="ghost"
+        icon="doc.fill"
         onPress={handlePickSheet}
         disabled={isSubmitting}
       />
 
-      <KeyPicker value={targetKey} onChange={setTargetKey} disabled={isSubmitting} />
+      <Card style={styles.section}>
+        <KeyPicker value={targetKey} onChange={setTargetKey} disabled={isSubmitting} />
+      </Card>
 
       {isSubmitting ? (
         <ProcessingStatus
@@ -177,7 +179,7 @@ export default function TransposeScreen() {
       {!isSubmitting ? (
         <Button
           label={status === 'failed' ? 'Try again' : 'Transpose'}
-          variant="success"
+          icon="arrow.up.arrow.down"
           onPress={handleSubmit}
           disabled={!sheetUri}
         />
@@ -194,7 +196,7 @@ export default function TransposeScreen() {
 
 const styles = StyleSheet.create({
   container: { gap: 16, paddingBottom: 40 },
-  section: { gap: 8 },
+  section: { gap: 10 },
   errorTitle: { fontSize: 15, fontWeight: '700' },
   errorMessage: { fontSize: 13, lineHeight: 18 },
 });

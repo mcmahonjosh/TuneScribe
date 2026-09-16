@@ -6,6 +6,14 @@
     "dev:mobile": "cd mobile && npm run start:dev",
     "dev:mobile:lan": "cd mobile && npm run start:dev:lan",
     "build:ios:dev": "cd mobile && eas build --profile development --platform ios",
-    "setup:backend": "cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+    "build:ios:prod": "cd mobile && eas build --profile production --platform ios",
+    "setup:backend": "cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt",
+    "test:mobile": "cd mobile && npm test",
+    "typecheck:mobile": "cd mobile && npm run typecheck",
+    "preflight:ios": "cd mobile && npm run typecheck && npm test",
+    "test:backend": "cd backend && (.venv/bin/pytest -q || pytest -q)"
+  },
+  "dependencies": {
+    "expo-screen-orientation": "^9.0.9"
   }
 }

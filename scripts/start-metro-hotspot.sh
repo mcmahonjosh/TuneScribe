@@ -15,15 +15,25 @@ for arg in "$@"; do
   fi
 done
 
-detect_hotspot_ip() {
+detect_windows_lan_ip() {
   powershell.exe -NoProfile -Command "
-    (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+    \$addrs = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
       Where-Object {
-        \$_.IPAddress -like '172.20.10.*' -and
-        \$_.IPAddress -ne '172.20.10.1'
-      } |
+        \$_.IPAddress -notlike '127.*' -and
+        \$_.IPAddress -notlike '169.254.*' -and
+        \$_.IPAddress -notlike '172.17.*' -and
+        \$_.IPAddress -notlike '172.24.*' -and
+        \$_.IPAddress -notlike '172.29.*'
+      }
+    \$hotspot = \$addrs |
+      Where-Object { \$_.IPAddress -like '172.20.10.*' -and \$_.IPAddress -ne '172.20.10.1' } |
       Sort-Object InterfaceMetric |
-      Select-Object -First 1 -ExpandProperty IPAddress)
+      Select-Object -First 1 -ExpandProperty IPAddress
+    if (\$hotspot) { \$hotspot; exit 0 }
+    \$addrs |
+      Where-Object { \$_.IPAddress -like '10.*' -or \$_.IPAddress -like '192.168.*' } |
+      Sort-Object InterfaceMetric |
+      Select-Object -First 1 -ExpandProperty IPAddress
   " 2>/dev/null | tr -d '\r'
 }
 
@@ -43,11 +53,11 @@ stop_listener_on_port() {
   sleep 1
 }
 
-WIN_IP="$(detect_hotspot_ip)"
+WIN_IP="$(detect_windows_lan_ip)"
 
 if [[ -z "$WIN_IP" ]]; then
-  echo "No iPhone hotspot IP found (172.20.10.x)."
-  echo "Connect PC to the phone hotspot, or run: npm run start:tunnel"
+  echo "No Windows LAN/hotspot IP found."
+  echo "Connect this PC to the same Wi-Fi as the phone, or run: npm run start:tunnel"
   exit 1
 fi
 

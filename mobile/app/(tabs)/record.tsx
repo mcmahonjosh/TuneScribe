@@ -5,7 +5,16 @@ import { Alert, StyleSheet, View } from 'react-native';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import RecordingControls from '@/components/RecordingControls';
 import TranscriptionSettingsPanel from '@/components/TranscriptionSettingsPanel';
-import { AppHeader, Card, Chip, MutedText, Screen, SectionTitle } from '@/components/ui';
+import {
+  AppHeader,
+  Card,
+  Chip,
+  InfoBanner,
+  MutedText,
+  Screen,
+  SectionTitle,
+  SelectableTile,
+} from '@/components/ui';
 import {
   playAudio,
   requestRecordingPermissions,
@@ -73,21 +82,25 @@ export default function RecordScreen() {
     id: PianoOutputFormat;
     label: string;
     hint: string;
+    icon: string;
   }[] = [
     {
       id: 'sheet_music',
-      label: 'Sheet music',
+      label: 'Sheet Music',
       hint: 'Full note-for-note notation (current behavior).',
+      icon: 'music.note',
     },
     {
       id: 'chords',
-      label: 'Chord progression',
+      label: 'Chord Progression',
       hint: 'Estimates the song’s chords — a good overview, not every note.',
+      icon: 'square.stack',
     },
     {
       id: 'both',
       label: 'Both',
       hint: 'Generate notation and chords; switch views after transcribing.',
+      icon: 'sparkles',
     },
   ];
 
@@ -215,37 +228,41 @@ export default function RecordScreen() {
     <Screen scroll contentContainerStyle={styles.container}>
       <AppHeader title="New Recording" subtitle="Record 15–60 seconds of solo piano or vocal audio." />
 
-      <Card style={styles.section}>
-        <MutedText>
-          Processing runs entirely on your device. Keep the app open while transcribing.
-        </MutedText>
-      </Card>
+      <InfoBanner>
+        Processing runs entirely on your device. Keep the app open while transcribing.
+      </InfoBanner>
 
       <View style={styles.chipRow}>
-        {(['piano', 'vocal'] as const).map((type) => (
-          <Chip
-            key={type}
-            label={type === 'piano' ? 'Piano' : 'Vocal'}
-            selected={inputType === type}
-            onPress={() => setInputType(type)}
-            disabled={isRecording || isSubmitting}
-            style={styles.flexChip}
-          />
-        ))}
+        <Chip
+          label="Piano"
+          icon="music.note"
+          selected={inputType === 'piano'}
+          onPress={() => setInputType('piano')}
+          disabled={isRecording || isSubmitting}
+          style={styles.flexChip}
+        />
+        <Chip
+          label="Vocal"
+          icon="mic.fill"
+          selected={inputType === 'vocal'}
+          onPress={() => setInputType('vocal')}
+          disabled={isRecording || isSubmitting}
+          style={styles.flexChip}
+        />
       </View>
 
       {inputType === 'piano' && (
         <Card style={styles.section}>
-          <SectionTitle>Piano output</SectionTitle>
-          <View style={styles.chipRow}>
+          <SectionTitle>Output</SectionTitle>
+          <View style={styles.tileRow}>
             {PIANO_OUTPUT_OPTIONS.map((option) => (
-              <Chip
+              <SelectableTile
                 key={option.id}
                 label={option.label}
+                icon={option.icon}
                 selected={pianoOutputFormat === option.id}
                 onPress={() => setPianoOutputFormat(option.id)}
                 disabled={isRecording || isSubmitting}
-                style={styles.flexChip}
               />
             ))}
           </View>
@@ -290,7 +307,8 @@ export default function RecordScreen() {
 
 const styles = StyleSheet.create({
   container: { gap: 16, paddingBottom: 40 },
-  section: { gap: 8 },
+  section: { gap: 10 },
   chipRow: { flexDirection: 'row', gap: 10 },
+  tileRow: { flexDirection: 'row', gap: 10 },
   flexChip: { flex: 1 },
 });

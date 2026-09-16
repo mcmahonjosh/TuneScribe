@@ -94,12 +94,10 @@ function transposePitchXml(pitchXml: string, semitones: number): string {
   return `<pitch><step>${transposed.step}</step>${alterTag}<octave>${transposed.octave}</octave></pitch>`;
 }
 
-export async function transposeMusicXmlFile(
-  inputUri: string,
-  outputUri: string,
+export function transposeMusicXmlContent(
+  xml: string,
   target: TargetKey
-): Promise<{ sourceKey: TargetKey; outputXml: string }> {
-  const xml = await readMusicXmlContent(inputUri);
+): { sourceKey: TargetKey; outputXml: string } {
   const fifths = parseFifths(xml);
   const sourceMode = /<mode>minor<\/mode>/.test(xml) ? 'minor' : 'major';
   const sourceTonic = fifths !== null ? fifthsToTonic(fifths, sourceMode) : 'C';
@@ -121,8 +119,18 @@ export async function transposeMusicXmlFile(
     `<key><fifths>${targetFifths}</fifths><mode>${target.mode}</mode></key>`
   );
 
-  await FileSystem.writeAsStringAsync(outputUri, withKey, {
+  return { sourceKey, outputXml: withKey };
+}
+
+export async function transposeMusicXmlFile(
+  inputUri: string,
+  outputUri: string,
+  target: TargetKey
+): Promise<{ sourceKey: TargetKey; outputXml: string }> {
+  const xml = await readMusicXmlContent(inputUri);
+  const result = transposeMusicXmlContent(xml, target);
+  await FileSystem.writeAsStringAsync(outputUri, result.outputXml, {
     encoding: FileSystem.EncodingType.UTF8,
   });
-  return { sourceKey, outputXml: withKey };
+  return result;
 }

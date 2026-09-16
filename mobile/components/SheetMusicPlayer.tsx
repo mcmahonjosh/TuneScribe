@@ -1,8 +1,9 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { type StyleProp, type ViewStyle, useWindowDimensions } from 'react-native';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
-import { buildSheetMusicPlayerHtml } from '@/components/sheetMusicPlayerHtml';
+import { buildSheetMusicPlayerHtml, type SheetPlayerVariant } from '@/components/sheetMusicPlayerHtml';
 import { Button } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
 import { useThemedStyles } from '@/hooks/useThemedStyles';
@@ -43,25 +44,39 @@ interface SheetMusicPlayerProps {
   midiBase64?: string | null;
   previewWavUri?: string | null;
   onPlaybackStateChange?: (state: SheetPlaybackState) => void;
+  variant?: SheetPlayerVariant;
+  style?: StyleProp<ViewStyle>;
 }
+
+const PAPER = '#f7f4ea';
 
 const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProps>(
   function SheetMusicPlayer(
-    { musicxmlContent, midiBase64, previewWavUri, onPlaybackStateChange },
+    {
+      musicxmlContent,
+      midiBase64,
+      previewWavUri,
+      onPlaybackStateChange,
+      variant = 'fullscreen',
+      style,
+    },
     ref
   ) {
+    const compact = variant === 'compact';
     const { themeId, theme } = useTheme();
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const webViewRef = useRef<WebView>(null);
     const timingsRef = useRef<SheetNoteTiming[]>([]);
     const [playbackState, setPlaybackState] = useState<SheetPlaybackState>('idle');
     const [statusText, setStatusText] = useState('Loading score...');
     const styles = useThemedStyles((t) => ({
       container: {
-        borderRadius: 14,
+        borderRadius: compact ? 14 : 0,
         overflow: 'hidden' as const,
-        borderWidth: 1,
+        borderWidth: compact ? 1 : 0,
         borderColor: t.border,
-        backgroundColor: t.surface,
+        backgroundColor: PAPER,
+        flex: compact ? undefined : 1,
       },
       controls: {
         flexDirection: 'row' as const,
@@ -74,7 +89,9 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
       controlBtn: { flex: 1, paddingVertical: 10 },
       status: { fontSize: 12, color: t.textMuted, padding: 10 },
       warning: { fontSize: 12, color: t.warning, paddingHorizontal: 10, paddingBottom: 8 },
-      webview: { minHeight: 280, backgroundColor: t.sheetBackground },
+      webview: compact
+        ? { height: 196, backgroundColor: PAPER }
+        : { flex: 1, backgroundColor: PAPER },
       playingBadge: {
         fontSize: 12,
         color: t.success,
@@ -83,7 +100,12 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
         textAlign: 'center' as const,
       },
     }));
-    const playerHtml = buildSheetMusicPlayerHtml(musicxmlContent, midiBase64 ?? null, themeId);
+    const playerHtml = buildSheetMusicPlayerHtml(
+      musicxmlContent,
+      midiBase64 ?? null,
+      themeId,
+      variant
+    );
 
     const updateState = useCallback(
       (state: SheetPlaybackState) => {
@@ -111,6 +133,23 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
         `window.tunescribeResetCursor && window.tunescribeResetCursor(); true;`
       );
     }, []);
+
+    useEffect(() => {
+      if (compact) return;
+      webViewRef.current?.injectJavaScript('window.dispatchEvent(new Event("resize")); true;');
+    }, [compact, windowWidth, windowHeight]);
+
+    const handleWebViewLayout = useCallback(
+      (event: { nativeEvent: { layout: { width: number; height: number } } }) => {
+        if (compact) return;
+        const { width, height } = event.nativeEvent.layout;
+        if (width < 40 || height < 40) return;
+        setTimeout(() => {
+          webViewRef.current?.injectJavaScript('window.dispatchEvent(new Event("resize")); true;');
+        }, 80);
+      },
+      [compact]
+    );
 
     const stopPlayback = useCallback(async () => {
       await stopSheetAudio();
@@ -260,57 +299,64 @@ const SheetMusicPlayer = forwardRef<SheetMusicPlayerHandle, SheetMusicPlayerProp
         playbackState === 'error');
 
     return (
-      <View style={styles.container}>
-        <View style={styles.controls}>
-          {isLoading ? (
-            <View style={[styles.controlBtn, { alignItems: 'center', justifyContent: 'center' }]}>
-              <ActivityIndicator color={theme.primary} size="small" />
-            </View>
-          ) : (
+      <View style={[styles.container, style]}>
+        {!compact ? (
+          <View style={styles.controls}>
+            {isLoading ? (
+              <View style={[styles.controlBtn, { alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator color={theme.primary} size="small" />
+              </View>
+            ) : (
+              <Button
+                label={isPlaying ? '▶ Playing' : isPaused ? '▶ Resume' : '▶ Play'}
+                variant="success"
+                onPress={() => (isPaused ? void resumePlayback() : void startPlayback())}
+                disabled={!canStart || isLoading}
+                style={styles.controlBtn}
+              />
+            )}
             <Button
-              label={isPlaying ? '▶ Playing' : isPaused ? '▶ Resume' : '▶ Play'}
-              variant="success"
-              onPress={() => (isPaused ? void resumePlayback() : void startPlayback())}
-              disabled={!canStart || isLoading}
+              label="⏸ Pause"
+              variant="warning"
+              onPress={() => void pausePlayback()}
+              disabled={!isPlaying}
               style={styles.controlBtn}
             />
-          )}
-          <Button
-            label="⏸ Pause"
-            variant="warning"
-            onPress={() => void pausePlayback()}
-            disabled={!isPlaying}
-            style={styles.controlBtn}
-          />
-          <Button
-            label="■ Stop"
-            variant="secondary"
-            onPress={() => void stopPlayback()}
-            disabled={playbackState === 'stopped'}
-            style={styles.controlBtn}
-          />
-        </View>
-        <Text style={styles.status}>{statusText}</Text>
-        {!previewWavUri && (
+            <Button
+              label="■ Stop"
+              variant="secondary"
+              onPress={() => void stopPlayback()}
+              disabled={playbackState === 'stopped'}
+              style={styles.controlBtn}
+            />
+          </View>
+        ) : null}
+        {!compact ? <Text style={styles.status}>{statusText}</Text> : null}
+        {!compact && !previewWavUri ? (
           <Text style={styles.warning}>
             Sheet music is ready. Preview audio was not generated for this project — export MusicXML
             still works.
           </Text>
-        )}
+        ) : null}
         <WebView
-          key={themeId}
+          key={`${themeId}-${variant}`}
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html: playerHtml }}
           style={styles.webview}
-          scrollEnabled
+          scrollEnabled={!compact}
+          nestedScrollEnabled
+          scalesPageToFit={!compact}
+          setBuiltInZoomControls={!compact}
+          setDisplayZoomControls={false}
           onMessage={handleMessage}
+          onLayout={handleWebViewLayout}
           javaScriptEnabled
           domStorageEnabled
         />
-        {isPlaying && (
+        {!compact && isPlaying ? (
           <Text style={styles.playingBadge}>● Playing with note highlights</Text>
-        )}
+        ) : null}
       </View>
     );
   }

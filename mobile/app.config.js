@@ -14,8 +14,10 @@ function isDevBuild() {
   if (profile === 'development') {
     return true;
   }
-  // Local `expo start` / prebuild without EAS profile
-  return process.env.NODE_ENV !== 'production';
+  // Local `expo start` often evaluates this file with NODE_ENV=production.
+  // Using NODE_ENV here made the QR use the App Store scheme (`tunescribe`)
+  // instead of TuneScribe Dev (`tunescribe-dev`).
+  return true;
 }
 
 function getDevHostFromEnv() {
@@ -97,13 +99,17 @@ if (devBuild) {
 module.exports = {
   expo: {
     ...base,
+    name: devBuild ? 'TuneScribe Dev' : base.name,
+    scheme: devBuild ? 'tunescribe-dev' : base.scheme,
     plugins,
     ios: {
       ...base.ios,
+      bundleIdentifier: devBuild ? 'com.tunescribe.app.dev' : base.ios?.bundleIdentifier,
       infoPlist: iosInfoPlist,
     },
     android: {
       ...base.android,
+      package: devBuild ? 'com.tunescribe.app.dev' : base.android?.package,
       ...(devBuild ? { usesCleartextTraffic: true } : { usesCleartextTraffic: false }),
     },
     owner: 'wizard10fun',

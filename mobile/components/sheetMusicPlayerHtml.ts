@@ -1,34 +1,47 @@
 /** OSMD score display + polyphonic highlight sync. Audio is played natively in React Native. */
 
 import { OSMD_LAYOUT_SETUP } from '@/components/osmdLayout';
+import { insertSystemBreaks } from '@/components/osmdLayoutLogic';
 import { themes, type ThemeId } from '@/constants/theme';
+
+export type SheetPlayerVariant = 'compact' | 'fullscreen';
+
+const PAPER = '#f7f4ea';
 
 export function buildSheetMusicPlayerHtml(
   musicxml: string,
   midiBase64: string | null,
-  themeId: ThemeId = 'violet'
+  themeId: ThemeId = 'violet',
+  variant: SheetPlayerVariant = 'fullscreen'
 ): string {
   const theme = themes[themeId];
-  const escapedXml = musicxml
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$');
-
   const escapedMidi = midiBase64
     ? midiBase64.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')
     : '';
 
+  const compact = variant === 'compact';
+  const layoutMode = compact ? 'compact' : 'fullscreen';
+  const scoreXml = layoutMode === 'fullscreen' ? insertSystemBreaks(musicxml, 3) : musicxml;
+  const escapedScoreXml = scoreXml
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$');
+  const viewport = compact
+    ? 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+    : 'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=4.0, user-scalable=yes';
+
   return `<!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="${viewport}">
   <script src="https://unpkg.com/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
   <script src="https://unpkg.com/@tonejs/midi@2.0.28/build/Midi.js"></script>
   <style>
+    html, body { height: 100%; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: ${theme.sheetBackground}; font-family: -apple-system, sans-serif; color: ${theme.text}; }
+    body { margin: 0; padding: 0; background: ${PAPER}; font-family: -apple-system, sans-serif; color: #1a1a1a; }
     #toolbar {
-      display: flex;
+      display: none;
       gap: 8px;
       padding: 8px;
       background: ${theme.surfaceElevated};
@@ -50,8 +63,8 @@ export function buildSheetMusicPlayerHtml(
     .tb-btn.pause { background: #f39c12; flex: 0.9; }
     .tb-btn.stop { background: #95a5a6; flex: 0.8; color: #fff; }
     .tb-btn:disabled { opacity: 0.45; }
-    #score { width: 100%; min-height: 200px; padding: 8px; }
-    #status { font-size: 12px; color: ${theme.textMuted}; padding: 0 10px 8px; min-height: 16px; }
+    #score { width: 100%; min-height: 200px; padding: 8px; background: ${PAPER}; ${compact ? '' : 'touch-action: pan-x pan-y pinch-zoom;'} }
+    #status { display: ${compact ? 'none' : 'block'}; font-size: 12px; color: ${theme.textMuted}; padding: 0 10px 8px; min-height: 16px; }
     .note-highlight path, .note-highlight ellipse, .note-highlight rect {
       fill: ${theme.primary} !important;
       stroke: ${theme.primaryMuted} !important;
@@ -69,7 +82,7 @@ export function buildSheetMusicPlayerHtml(
   <script>
     ${OSMD_LAYOUT_SETUP}
 
-    const musicXml = \`${escapedXml}\`;
+    const musicXml = \`${escapedScoreXml}\`;
     const midiBase64 = ${midiBase64 ? `\`${escapedMidi}\`` : 'null'};
 
     let osmd = null;
@@ -78,6 +91,8 @@ export function buildSheetMusicPlayerHtml(
     let playbackMode = 'stopped';
     let noteSchedule = [];
     let graphicNoteMap = [];
+
+    const layoutMode = '${layoutMode}';
 
     const statusEl = document.getElementById('status');
     const playBtn = document.getElementById('ts-play');
@@ -331,17 +346,35 @@ export function buildSheetMusicPlayerHtml(
     stopBtn.addEventListener('click', () => sendCommand('stop'));
 
     osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('score', {
-      autoResize: true,
+      autoResize: layoutMode !== 'fullscreen',
       drawTitle: false,
       backend: 'svg',
-      cursorsOptions: [{ type: 0, color: '#3b82f6', alpha: 0.25, follow: true }],
+      cursorsOptions: [{ type: 0, color: '#3b82f6', alpha: 0.18, follow: true }],
     });
 
-    osmd.load(musicXml).then(() => {
-      configureOsmdLayout(osmd);
+    let lastLayoutWidth = 0;
+    let lastLayoutHeight = 0;
+    function relayoutScore() {
+      if (!osmdReady || !osmd) return;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      if (Math.abs(width - lastLayoutWidth) < 12 && Math.abs(height - lastLayoutHeight) < 12) return;
+      lastLayoutWidth = width;
+      lastLayoutHeight = height;
+      configureOsmdLayout(osmd, layoutMode);
       osmd.render();
+      if (playbackMode !== 'playing' && osmd.cursor && osmd.cursor.hide) osmd.cursor.hide();
+    }
+
+    osmd.load(musicXml).then(() => {
+      configureOsmdLayout(osmd, layoutMode);
+      osmd.render();
+      lastLayoutWidth = window.innerWidth;
+      lastLayoutHeight = window.innerHeight;
+      if (osmd.cursor && osmd.cursor.hide) osmd.cursor.hide();
       osmdReady = true;
       graphicNoteMap = buildGraphicNoteMap();
+      if (osmd.cursor && osmd.cursor.hide) osmd.cursor.hide();
       const { notes, source } = prepareNoteSchedule();
       const peak = maxSimultaneous(notes);
       const polyHint = peak > 1 ? ' · up to ' + peak + ' notes together' : '';
@@ -360,10 +393,9 @@ export function buildSheetMusicPlayerHtml(
       updateToolbar();
     });
 
-    window.addEventListener('resize', () => {
-      if (!osmdReady || !osmd) return;
-      configureOsmdLayout(osmd);
-      osmd.render();
+    window.addEventListener('resize', relayoutScore);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(relayoutScore, 250);
     });
 
     window.tunescribeSetPlaybackMode = setPlaybackMode;

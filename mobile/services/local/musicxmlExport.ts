@@ -58,29 +58,62 @@ function secondsToBeats(seconds: number): number {
   return (seconds * TEMPO_BPM) / 60;
 }
 
-function beatsToDivisions(beats: number): number {
-  return Math.max(1, Math.round(beats * DIVISIONS));
-}
-
-function durationType(divisions: number): string {
-  if (divisions >= DIVISIONS * 4) return 'whole';
-  if (divisions >= DIVISIONS * 2) return 'half';
-  if (divisions >= DIVISIONS) return 'quarter';
-  if (divisions >= DIVISIONS / 2) return 'eighth';
-  return '16th';
+function durationParts(totalDivs: number): { divs: number; type: string; dots: number }[] {
+  const units = [
+    { divs: 16, type: 'whole', dots: 0 },
+    { divs: 12, type: 'half', dots: 1 },
+    { divs: 8, type: 'half', dots: 0 },
+    { divs: 6, type: 'quarter', dots: 1 },
+    { divs: 4, type: 'quarter', dots: 0 },
+    { divs: 3, type: 'eighth', dots: 1 },
+    { divs: 2, type: 'eighth', dots: 0 },
+    { divs: 1, type: '16th', dots: 0 },
+  ];
+  const parts: { divs: number; type: string; dots: number }[] = [];
+  let remaining = Math.max(1, Math.round(totalDivs));
+  for (const unit of units) {
+    while (remaining >= unit.divs) {
+      parts.push(unit);
+      remaining -= unit.divs;
+    }
+  }
+  return parts.length ? parts : [{ divs: 1, type: '16th', dots: 0 }];
 }
 
 function noteXml(
   pitch: number,
-  durationDivs: number,
-  options: { chord?: boolean; rest?: boolean; staff: StaffNumber }
+  part: { divs: number; type: string; dots: number },
+  options: {
+    chord?: boolean;
+    rest?: boolean;
+    staff: StaffNumber;
+    tie?: 'start' | 'stop' | 'continue';
+  }
 ): string {
   const staffXml = `<staff>${options.staff}</staff>`;
+  const dotXml = part.dots ? '<dot/>' : '';
+  const tieXml =
+    options.tie === 'start'
+      ? '<tie type="start"/>'
+      : options.tie === 'stop'
+        ? '<tie type="stop"/>'
+        : options.tie === 'continue'
+          ? '<tie type="stop"/><tie type="start"/>'
+          : '';
+  const notationsXml =
+    options.tie === 'start'
+      ? '<notations><tied type="start"/></notations>'
+      : options.tie === 'stop'
+        ? '<notations><tied type="stop"/></notations>'
+        : options.tie === 'continue'
+          ? '<notations><tied type="stop"/><tied type="start"/></notations>'
+          : '';
   if (options.rest) {
     return `<note>
   <rest/>
-  <duration>${durationDivs}</duration>
-  <type>${durationType(durationDivs)}</type>
+  <duration>${part.divs}</duration>
+  <type>${part.type}</type>
+  ${dotXml}
   ${staffXml}
 </note>`;
   }
@@ -89,9 +122,12 @@ function noteXml(
   const chordXml = options.chord ? '<chord/>\n  ' : '';
   return `<note>
   ${chordXml}<pitch><step>${step}</step>${alterXml}<octave>${octave}</octave></pitch>
-  <duration>${durationDivs}</duration>
-  <type>${durationType(durationDivs)}</type>
+  <duration>${part.divs}</duration>
+  <type>${part.type}</type>
+  ${dotXml}
+  ${tieXml}
   ${staffXml}
+  ${notationsXml}
 </note>`;
 }
 
@@ -129,32 +165,28 @@ function groupOnsets(notes: MidiNote[]): OnsetGroup[] {
   return groups;
 }
 
-function splitDuration(totalDivs: number): number[] {
-  const parts: number[] = [];
-  let remaining = totalDivs;
-  const units = [DIVISIONS * 4, DIVISIONS * 2, DIVISIONS, DIVISIONS / 2, 1].map((value) =>
-    Math.max(1, Math.round(value))
-  );
-  for (const unit of units) {
-    while (remaining >= unit) {
-      parts.push(unit);
-      remaining -= unit;
-    }
-  }
-  if (remaining > 0) parts.push(remaining);
-  return parts.length ? parts : [1];
-}
-
 function emitRest(divs: number, staff: StaffNumber): string {
-  return splitDuration(divs)
+  return durationParts(divs)
     .map((part) => noteXml(0, part, { rest: true, staff }))
     .join('\n');
 }
 
 function emitChord(pitches: number[], divs: number, staff: StaffNumber): string {
-  const duration = Math.max(1, divs);
-  return pitches
-    .map((pitch, pitchIndex) => noteXml(pitch, duration, { chord: pitchIndex > 0, staff }))
+  const parts = durationParts(Math.max(1, divs));
+  return parts
+    .map((part, partIndex) => {
+      let tie: 'start' | 'stop' | 'continue' | undefined;
+      if (parts.length > 1) {
+        if (partIndex === 0) tie = 'start';
+        else if (partIndex === parts.length - 1) tie = 'stop';
+        else tie = 'continue';
+      }
+      return pitches
+        .map((pitch, pitchIndex) =>
+          noteXml(pitch, part, { chord: pitchIndex > 0, staff, tie })
+        )
+        .join('\n');
+    })
     .join('\n');
 }
 
@@ -179,33 +211,45 @@ function emitStaffTimeline(
   measureEnd: number,
   staff: StaffNumber
 ): string {
-  const inMeasure = filterGroupsForStaff(groups, staff).filter(
-    (group) => group.startBeat < measureEnd && group.startBeat >= measureStart - 0.001
-  );
+  const inMeasure = filterGroupsForStaff(groups, staff)
+    .filter((group) => group.startBeat < measureEnd && group.startBeat >= measureStart - 0.001)
+    .map((group) => {
+      const startDiv = Math.max(
+        0,
+        Math.min(MEASURE_DIVS - 1, Math.round((group.startBeat - measureStart) * DIVISIONS))
+      );
+      const endDiv = Math.max(
+        startDiv + 1,
+        Math.min(MEASURE_DIVS, Math.round((group.endBeat - measureStart) * DIVISIONS))
+      );
+      return { startDiv, endDiv, pitches: group.pitches };
+    })
+    .sort((a, b) => a.startDiv - b.startDiv);
 
   if (!inMeasure.length) {
     return emitRest(MEASURE_DIVS, staff);
   }
 
   const chunks: string[] = [];
-  let cursor = measureStart;
+  let cursor = 0;
 
-  for (const group of inMeasure) {
-    const onset = Math.max(group.startBeat, measureStart);
-    if (onset > cursor + 1e-6) {
-      chunks.push(emitRest(beatsToDivisions(onset - cursor), staff));
+  for (let i = 0; i < inMeasure.length; i += 1) {
+    if (cursor >= MEASURE_DIVS) break;
+    const group = inMeasure[i];
+    const startDiv = Math.max(cursor, group.startDiv);
+    if (startDiv > cursor) {
+      chunks.push(emitRest(startDiv - cursor, staff));
+      cursor = startDiv;
     }
-
-    const nextOnset = inMeasure.find((candidate) => candidate.startBeat > group.startBeat + 1e-6);
-    const naturalEnd = Math.min(group.endBeat, measureEnd);
-    const cappedEnd = nextOnset ? Math.min(naturalEnd, nextOnset.startBeat) : naturalEnd;
-    const durationBeats = Math.max(0.25, cappedEnd - onset);
-    chunks.push(emitChord(group.pitches, beatsToDivisions(durationBeats), staff));
-    cursor = onset + durationBeats;
+    const nextStart = inMeasure[i + 1]?.startDiv ?? MEASURE_DIVS;
+    const duration = Math.max(1, Math.min(group.endDiv, nextStart, MEASURE_DIVS) - cursor);
+    if (duration <= 0) continue;
+    chunks.push(emitChord(group.pitches, duration, staff));
+    cursor += duration;
   }
 
-  if (cursor < measureEnd - 1e-6) {
-    chunks.push(emitRest(beatsToDivisions(measureEnd - cursor), staff));
+  if (cursor < MEASURE_DIVS) {
+    chunks.push(emitRest(MEASURE_DIVS - cursor, staff));
   }
 
   return chunks.join('\n');
@@ -250,15 +294,14 @@ function buildMeasures(groups: OnsetGroup[], key?: TargetKey): string[] {
   return measures;
 }
 
-export async function exportMusicXmlFromNotes(
-  outputPath: string,
+export function buildMusicXmlFromNotes(
   notes: MidiNote[],
   title = 'TuneScribe Transcription',
   key?: TargetKey
-): Promise<string> {
+): string {
   const groups = groupOnsets(notes);
   const measures = buildMeasures(groups, key);
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="3.1">
   <work><work-title>${escapeXml(title)}</work-title></work>
@@ -269,6 +312,15 @@ export async function exportMusicXmlFromNotes(
     ${measures.join('\n')}
   </part>
 </score-partwise>`;
+}
+
+export async function exportMusicXmlFromNotes(
+  outputPath: string,
+  notes: MidiNote[],
+  title = 'TuneScribe Transcription',
+  key?: TargetKey
+): Promise<string> {
+  const xml = buildMusicXmlFromNotes(notes, title, key);
   await FileSystem.writeAsStringAsync(outputPath, xml, {
     encoding: FileSystem.EncodingType.UTF8,
   });

@@ -12,6 +12,17 @@ This checklist covers GitHub Pages (privacy/support), EAS production build, Test
 - [ ] App Store Connect app created with bundle ID **com.tunescribe.app**
 - [ ] Expo account logged in (`eas login`) with access to project `65481381-34ca-4b69-85cb-197823bf7b57` (owner `wizard10fun`)
 - [ ] Privacy + Support URLs live (see §1)
+- [ ] **Preflight (required before production build):**
+
+```bash
+cd mobile
+npm run typecheck
+npm test
+# or from repo root:
+npm run preflight:ios
+```
+
+This gates MusicXML export/parse, quantize, transpose, OSMD system breaks, orientation helpers, MIDI bytes, and production `app.config.js` ATS / identity.
 
 ---
 
@@ -75,6 +86,9 @@ eas submit --platform ios --latest
 ### From macOS / Linux (when network to Expo works)
 
 ```bash
+# Always run preflight first
+npm run preflight:ios
+
 cd mobile
 eas build --profile production --platform ios
 eas submit --platform ios --latest

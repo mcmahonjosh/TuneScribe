@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 
 import { ProcessingModeProvider } from '@/context/ProcessingModeContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { lockAppToPortrait } from '@/utils/sheetOrientation';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -38,6 +39,10 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  useEffect(() => {
+    void lockAppToPortrait();
+  }, []);
 
   if (!loaded) {
     return (
@@ -80,16 +85,7 @@ function RootLayoutNav() {
       <StatusBar style="light" />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="project/[id]"
-          options={{
-            title: 'Project',
-            presentation: 'card',
-            headerStyle: { backgroundColor: theme.surface },
-            headerTintColor: theme.text,
-            headerTitleStyle: { fontWeight: '600' },
-          }}
-        />
+        <Stack.Screen name="project/[id]" options={{ headerShown: false }} />
       </Stack>
     </NavigationThemeProvider>
   );
